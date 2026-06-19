@@ -12,8 +12,11 @@
         <a href="{{ route('upload.create') }}" class="{{ request()->routeIs('upload.create') ? 'active' : '' }}">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Upload Data
         </a>
+        <a href="{{ route('upload.import-module') }}" class="{{ request()->routeIs('upload.import-module') || request()->routeIs('upload.import-module.store') ? 'active' : '' }}">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>Import Data
+        </a>
         <a href="{{ route('import-logs.index') }}" class="{{ request()->routeIs('import-logs.*') ? 'active' : '' }}">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>Upload History
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>Import History
         </a>
         <a href="{{ route('master-data.index') }}" class="{{ request()->routeIs('master-data.*') || request()->routeIs('provinces.*') || request()->routeIs('districts.*') || request()->routeIs('policies.*') ? 'active' : '' }}">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v6c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 11v6c0 1.66 4 3 9 3s9-1.34 9-3v-6"/></svg>Master Data

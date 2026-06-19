@@ -141,14 +141,59 @@ class DatabaseSeeder extends Seeder
         }
 
         $policies = [
-            'Property', 'Motor', 'Marine', 'Engineering', 'Aviation', 'Agriculture', 'Micro', 'Miscellaneous',
+            ['policy_id' => 1, 'parent_id' => null, 'policy_name' => 'Property', 'code' => 'PT01'],
+            ['policy_id' => 2, 'parent_id' => null, 'policy_name' => 'Motor', 'code' => 'PT02'],
+            ['policy_id' => 3, 'parent_id' => null, 'policy_name' => 'Marine', 'code' => 'PT03'],
+            ['policy_id' => 4, 'parent_id' => null, 'policy_name' => 'Engineering', 'code' => 'PT04'],
+            ['policy_id' => 5, 'parent_id' => null, 'policy_name' => 'Aviation', 'code' => 'PT05'],
+            ['policy_id' => 6, 'parent_id' => null, 'policy_name' => 'Agriculture', 'code' => 'PT06'],
+            ['policy_id' => 7, 'parent_id' => null, 'policy_name' => 'Micro', 'code' => 'PT07'],
+            ['policy_id' => 8, 'parent_id' => null, 'policy_name' => 'Miscellaneous', 'code' => 'PT08'],
+            ['policy_id' => 14, 'parent_id' => null, 'policy_name' => 'Imported Policy 14', 'code' => 'PT14'],
+            ['policy_id' => 15, 'parent_id' => null, 'policy_name' => 'Imported Policy 15', 'code' => 'PT15'],
+            ['policy_id' => 16, 'parent_id' => null, 'policy_name' => 'Imported Policy 16', 'code' => 'PT16'],
+            ['policy_id' => 18, 'parent_id' => null, 'policy_name' => 'Imported Policy 18', 'code' => 'PT18'],
+            ['policy_id' => 19, 'parent_id' => null, 'policy_name' => 'Imported Policy 19', 'code' => 'PT19'],
+            ['policy_id' => 20, 'parent_id' => 19, 'policy_name' => 'Imported Sub Policy 20', 'code' => 'SP20'],
+            ['policy_id' => 21, 'parent_id' => 19, 'policy_name' => 'Imported Sub Policy 21', 'code' => 'SP21'],
+            ['policy_id' => 22, 'parent_id' => 19, 'policy_name' => 'Imported Sub Policy 22', 'code' => 'SP22'],
+            ['policy_id' => 23, 'parent_id' => 19, 'policy_name' => 'Imported Sub Policy 23', 'code' => 'SP23'],
+            ['policy_id' => 26, 'parent_id' => 19, 'policy_name' => 'Imported Sub Policy 26', 'code' => 'SP26'],
+            ['policy_id' => 27, 'parent_id' => 19, 'policy_name' => 'Imported Sub Policy 27', 'code' => 'SP27'],
+            ['policy_id' => 28, 'parent_id' => null, 'policy_name' => 'Imported Policy 28', 'code' => 'PT28'],
+            ['policy_id' => 29, 'parent_id' => 28, 'policy_name' => 'Imported Sub Policy 29', 'code' => 'SP29'],
+            ['policy_id' => 30, 'parent_id' => 28, 'policy_name' => 'Imported Sub Policy 30', 'code' => 'SP30'],
+            ['policy_id' => 31, 'parent_id' => 28, 'policy_name' => 'Imported Sub Policy 31', 'code' => 'SP31'],
+            ['policy_id' => 44, 'parent_id' => 14, 'policy_name' => 'Imported Sub Policy 44', 'code' => 'SP44'],
+            ['policy_id' => 46, 'parent_id' => null, 'policy_name' => 'Imported Policy 46', 'code' => 'PT46'],
+            ['policy_id' => 47, 'parent_id' => 46, 'policy_name' => 'Imported Sub Policy 47', 'code' => 'SP47'],
+            ['policy_id' => 48, 'parent_id' => 46, 'policy_name' => 'Imported Sub Policy 48', 'code' => 'SP48'],
+            ['policy_id' => 49, 'parent_id' => 46, 'policy_name' => 'Imported Sub Policy 49', 'code' => 'SP49'],
+            ['policy_id' => 50, 'parent_id' => 46, 'policy_name' => 'Imported Sub Policy 50', 'code' => 'SP50'],
+            ['policy_id' => 51, 'parent_id' => 46, 'policy_name' => 'Imported Sub Policy 51', 'code' => 'SP51'],
+            ['policy_id' => 52, 'parent_id' => 46, 'policy_name' => 'Imported Sub Policy 52', 'code' => 'SP52'],
+            ['policy_id' => 55, 'parent_id' => 14, 'policy_name' => 'Imported Sub Policy 55', 'code' => 'SP55'],
         ];
 
-        foreach ($policies as $index => $policyName) {
+        foreach (array_filter($policies, fn (array $policy) => $policy['parent_id'] === null) as $policy) {
             Policy::updateOrCreate(
-                ['policy_name' => $policyName],
+                ['policy_id' => $policy['policy_id']],
                 [
-                    'code' => 'PT'.str_pad((string) ($index + 1), 2, '0', STR_PAD_LEFT),
+                    'parent_id' => null,
+                    'policy_name' => $policy['policy_name'],
+                    'code' => $policy['code'],
+                    'status' => 'active',
+                ]
+            );
+        }
+
+        foreach (array_filter($policies, fn (array $policy) => $policy['parent_id'] !== null) as $policy) {
+            Policy::updateOrCreate(
+                ['policy_id' => $policy['policy_id']],
+                [
+                    'parent_id' => $policy['parent_id'],
+                    'policy_name' => $policy['policy_name'],
+                    'code' => $policy['code'],
                     'status' => 'active',
                 ]
             );

@@ -2,12 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\District;
 use App\Models\ImportLog;
+use App\Models\Policy;
+use App\Models\Province;
+use App\Models\Transaction;
 use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
+use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ImportLogController extends Controller
 {
@@ -21,26 +28,45 @@ class ImportLogController extends Controller
 
     public function create(): View
     {
-        $recentUploads = ImportLog::latest('date')->limit(3)->get();
+        $recentUploads = ImportLog::latest('date')->latest('id')->limit(3)->get();
         $today = now();
         $currentPeriod = $this->currentBsPeriod($today);
         $monthNames = $this->bsMonthNames();
         $submissionDateBs = $this->currentBsDate($today, $monthNames);
         $fiscalYearOptions = $this->fiscalYearOptions($currentPeriod['fiscal_year']);
+        $selectedImportLog = ImportLog::find(session('selected_import_log_id'));
 
         return view('import-logs.create', compact(
             'recentUploads',
             'currentPeriod',
             'monthNames',
             'submissionDateBs',
-            'fiscalYearOptions'
+            'fiscalYearOptions',
+            'selectedImportLog'
         ));
+    }
+
+    public function importModule(): View
+    {
+        $monthNames = $this->bsMonthNames();
+        $availableImportLogs = ImportLog::whereDoesntHave('transactions')
+            ->latest('date')
+            ->latest('id')
+            ->get();
+        $selectedImportLog = $availableImportLogs->firstWhere('id', session('selected_import_log_id')) ?? $availableImportLogs->first();
+        $importHistory = ImportLog::with(['user', 'transactions'])
+            ->withCount('transactions')
+            ->whereHas('transactions')
+            ->latest('date')
+            ->latest('id')
+            ->get();
+
+        return view('import-logs.import', compact('availableImportLogs', 'monthNames', 'selectedImportLog', 'importHistory'));
     }
 
     public function store(Request $request): RedirectResponse
     {
         $today = now();
-        $currentPeriod = $this->currentBsPeriod($today);
 
         $validated = $request->validate([
             'fiscal_year' => ['required', 'string', 'max:255'],
@@ -58,19 +84,37 @@ class ImportLogController extends Controller
         $storagePath = 'uploads/'.$fiscalYearFolder.'/'.$monthFolder;
         $storedFile = $file->storeAs($storagePath, $fileName, 'public');
 
-        ImportLog::create([
+        $importLog = ImportLog::create([
             'date' => $today->toDateString(),
             'user_id' => auth()->id(),
             'file_name' => $storedFile,
             'fiscal_year' => $validated['fiscal_year'],
             'month' => $validated['month'],
-            'status' => 'completed',
+            'status' => 'pending',
         ]);
 
-        return redirect()->route('upload.create')->with('toast', [
-            'message' => 'File uploaded and log saved successfully.',
-            'type' => 'success',
+        return redirect()->route('upload.create')
+            ->with('selected_import_log_id', $importLog->id)
+            ->with('toast', [
+                'message' => 'File uploaded successfully. Continue with Step 3 to import it into the database.',
+                'type' => 'success',
+            ]);
+    }
+
+    public function import(ImportLog $importLog): RedirectResponse
+    {
+        return $this->performImport($importLog, 'upload.create');
+    }
+
+    public function importFromModule(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'import_log_id' => ['required', 'integer', 'exists:import_logs,id'],
         ]);
+
+        $importLog = ImportLog::findOrFail($validated['import_log_id']);
+
+        return $this->performImport($importLog, 'upload.import-module');
     }
 
     public function edit(ImportLog $importLog): View
@@ -127,6 +171,233 @@ class ImportLogController extends Controller
             'message' => 'Import log and uploaded file deleted successfully.',
             'type' => 'success',
         ]);
+    }
+
+    public function destroyImportedData(ImportLog $importLog): RedirectResponse
+    {
+        $deletedRows = 0;
+
+        DB::transaction(function () use ($importLog, &$deletedRows) {
+            $deletedRows = Transaction::where('import_log_id', $importLog->id)->delete();
+            $importLog->update(['status' => 'pending']);
+        });
+
+        return redirect()->route('upload.import-module')->with('toast', [
+            'message' => $deletedRows > 0
+                ? 'Imported database rows deleted successfully. The uploaded file is still available for re-import.'
+                : 'No imported database rows were found for this file.',
+            'type' => $deletedRows > 0 ? 'success' : 'warning',
+        ]);
+    }
+
+    private function performImport(ImportLog $importLog, string $redirectRoute): RedirectResponse
+    {
+        if ($importLog->status === 'completed') {
+            return redirect()->route($redirectRoute)
+                ->with('selected_import_log_id', $importLog->id)
+                ->with('toast', [
+                    'message' => 'This file has already been imported.',
+                    'type' => 'success',
+                ]);
+        }
+
+        try {
+            DB::transaction(function () use ($importLog) {
+                $importLog->update(['status' => 'processing']);
+
+                Transaction::where('import_log_id', $importLog->id)->delete();
+
+                $importBatchToken = (string) Str::uuid();
+                $transactions = $this->buildTransactionsFromUpload($importLog, $importLog->fiscal_year, (int) $importLog->month, $importBatchToken);
+
+                if (empty($transactions)) {
+                    throw new \RuntimeException('No valid transaction rows were found in the uploaded file.');
+                }
+
+                Transaction::insert($transactions);
+
+                $importLog->update(['status' => 'completed']);
+            });
+        } catch (\Throwable $exception) {
+            $importLog->update(['status' => 'failed']);
+
+            return redirect()->route($redirectRoute)
+                ->with('selected_import_log_id', $importLog->id)
+                ->withErrors([
+                    'file' => 'Import failed: '.$exception->getMessage(),
+                ]);
+        }
+
+        return redirect()->route($redirectRoute)
+            ->with('selected_import_log_id', $importLog->id)
+            ->with('toast', [
+                'message' => 'Transactions imported into the database successfully.',
+                'type' => 'success',
+            ]);
+    }
+
+    private function buildTransactionsFromUpload(ImportLog $importLog, string $fiscalYear, int $selectedMonth, string $importBatchToken): array
+    {
+        $filePath = Storage::disk('public')->path($importLog->file_name);
+        $worksheet = IOFactory::load($filePath)->getActiveSheet();
+        $rows = $worksheet->toArray(null, true, true, false);
+
+        if (count($rows) < 2) {
+            return [];
+        }
+
+        $headerIndex = $this->findHeaderRowIndex($rows);
+
+        if ($headerIndex === null) {
+            throw new \RuntimeException('The uploaded file is missing the required transaction headers.');
+        }
+
+        $headers = array_map(fn ($value) => $this->normalizeHeader((string) $value), $rows[$headerIndex]);
+        $transactions = [];
+        $timestamp = now();
+        $validProvinceIds = Province::query()->pluck('province_id')->flip();
+        $validDistrictIds = District::query()->pluck('district_id')->flip();
+        $validPolicyIds = Policy::query()->pluck('policy_id')->flip();
+
+        foreach (array_slice($rows, $headerIndex + 1) as $row) {
+            $mappedRow = [];
+
+            foreach ($headers as $index => $header) {
+                if ($header === '') {
+                    continue;
+                }
+
+                $mappedRow[$header] = $row[$index] ?? null;
+            }
+
+            if (! $this->isTransactionRow($mappedRow)) {
+                continue;
+            }
+
+            $stateId = $this->sanitizeForeignKey($mappedRow['stateid'] ?? null, $validProvinceIds);
+            $districtId = $this->sanitizeForeignKey($mappedRow['districtid'] ?? null, $validDistrictIds);
+            $policyId = $this->sanitizeForeignKey($mappedRow['staticpoliciesid'] ?? null, $validPolicyIds);
+            $subPolicyId = $this->sanitizeForeignKey($mappedRow['staticsubpoliciesid'] ?? null, $validPolicyIds);
+
+            $transactions[] = [
+                'import_log_id' => $importLog->id,
+                'import_batch_token' => $importBatchToken,
+                'state_id' => $stateId,
+                'district_id' => $districtId,
+                'static_policies_id' => $policyId,
+                'static_sub_policies_id' => $subPolicyId,
+                'fiscal_year' => $fiscalYear,
+                'month' => $this->nullableInteger($mappedRow['month'] ?? null) ?? $selectedMonth,
+                'number_of_issued_policy' => $this->numericInteger($mappedRow['numberofissuedpolicy'] ?? null),
+                'as_on_issued_policy' => $this->numericInteger($mappedRow['asonissuedpolicy'] ?? null),
+                'gross_premium_income' => $this->numericDecimal($mappedRow['grosspremiumincome'] ?? null),
+                'sum_insured' => $this->numericDecimal($mappedRow['suminsured'] ?? null),
+                'number_of_gross_claim' => $this->numericInteger($mappedRow['numberofgrossclaim'] ?? null),
+                'amount_of_gross_claim' => $this->numericDecimal($mappedRow['amountofgrossclaim'] ?? null),
+                'number_of_gross_claim_paid' => $this->numericInteger($mappedRow['numberofgrossclaimpaid'] ?? null),
+                'amount_of_gross_claim_paid' => $this->numericDecimal($mappedRow['amountofgrossclaimpaid'] ?? null),
+                'number_of_outstanding_claim' => $this->numericInteger($mappedRow['numberofoutstandingclaim'] ?? null),
+                'amount_of_outstanding_claim' => $this->numericDecimal($mappedRow['amountofoutstandingclaim'] ?? null),
+                'remarks' => $this->nullableString($mappedRow['remarks'] ?? null),
+                'created_at' => $timestamp,
+                'updated_at' => $timestamp,
+            ];
+        }
+
+        return $transactions;
+    }
+
+    private function findHeaderRowIndex(array $rows): ?int
+    {
+        $requiredHeaders = [
+            'stateid',
+            'districtid',
+            'month',
+            'staticpoliciesid',
+            'staticsubpoliciesid',
+            'numberofissuedpolicy',
+            'asonissuedpolicy',
+            'grosspremiumincome',
+            'suminsured',
+            'numberofgrossclaim',
+            'amountofgrossclaim',
+            'numberofgrossclaimpaid',
+            'amountofgrossclaimpaid',
+            'numberofoutstandingclaim',
+            'amountofoutstandingclaim',
+            'remarks',
+        ];
+
+        foreach ($rows as $index => $row) {
+            $normalizedRow = array_map(fn ($value) => $this->normalizeHeader((string) $value), $row);
+
+            if (empty(array_diff($requiredHeaders, $normalizedRow))) {
+                return $index;
+            }
+        }
+
+        return null;
+    }
+
+    private function isTransactionRow(array $mappedRow): bool
+    {
+        $requiredIds = [
+            $this->nullableInteger($mappedRow['stateid'] ?? null),
+            $this->nullableInteger($mappedRow['districtid'] ?? null),
+            $this->nullableInteger($mappedRow['staticpoliciesid'] ?? null),
+        ];
+
+        return count(array_filter($requiredIds, fn ($value) => $value !== null)) === count($requiredIds);
+    }
+
+    private function normalizeHeader(string $header): string
+    {
+        return strtolower(preg_replace('/[^a-z0-9]+/i', '', trim($header)) ?? '');
+    }
+
+    private function nullableInteger(mixed $value): ?int
+    {
+        if ($value === null || trim((string) $value) === '') {
+            return null;
+        }
+
+        return (int) round((float) str_replace(',', '', (string) $value));
+    }
+
+    private function numericInteger(mixed $value): int
+    {
+        return $this->nullableInteger($value) ?? 0;
+    }
+
+    private function numericDecimal(mixed $value): float
+    {
+        if ($value === null || trim((string) $value) === '') {
+            return 0;
+        }
+
+        return round((float) str_replace(',', '', (string) $value), 2);
+    }
+
+    private function sanitizeForeignKey(mixed $value, \Illuminate\Support\Collection $validIds): ?int
+    {
+        $normalized = $this->nullableInteger($value);
+
+        if ($normalized === null) {
+            return null;
+        }
+
+        return $validIds->has($normalized) ? $normalized : null;
+    }
+
+    private function nullableString(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $trimmed = trim((string) $value);
+
+        return $trimmed === '' ? null : $trimmed;
     }
 
     private function currentBsPeriod(CarbonInterface $date): array

@@ -70,6 +70,10 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/upload', [ImportLogController::class, 'create'])->name('upload.create');
     Route::post('/upload', [ImportLogController::class, 'store'])->name('upload.store');
+    Route::get('/import-data', [ImportLogController::class, 'importModule'])->name('upload.import-module');
+    Route::post('/import-data', [ImportLogController::class, 'importFromModule'])->name('upload.import-module.store');
+    Route::delete('/import-data/{importLog}', [ImportLogController::class, 'destroyImportedData'])->name('upload.import-module.destroy');
+    Route::post('/upload/{importLog}/import', [ImportLogController::class, 'import'])->name('upload.import');
 
     Route::get('/master-data', function () {
         $provinces = Province::withCount(['districts', 'branches'])->orderBy('province_name')->get();

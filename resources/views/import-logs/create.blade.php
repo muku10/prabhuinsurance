@@ -2,10 +2,10 @@
     <x-slot name="title">Upload Data</x-slot>
     <x-slot name="crumbs">Upload Data</x-slot>
 
-    <form method="POST" action="{{ route('upload.store') }}" enctype="multipart/form-data" id="uploadForm">
-        @csrf
-        <div class="grid cols-3 mb-6">
-            <div style="grid-column: span 2;">
+    <div class="grid cols-3 mb-6">
+        <div style="grid-column: span 2;">
+            <form method="POST" action="{{ route('upload.store') }}" enctype="multipart/form-data" id="uploadForm">
+                @csrf
                 <div class="card">
                     <div class="card-head"><h2>Step 1 - Select reporting period</h2></div>
                     <div class="card-body">
@@ -68,55 +68,68 @@
                         </div>
                     </div>
                 </div>
+            </form>
 
-                <div class="card mt-4">
-                    <div class="card-head">
-                        <h2>Step 3 - Validation Result</h2>
-                        <span class="badge success">Ready to import</span>
+            <div class="card mt-4">
+                <div class="card-head">
+                    <h2>Step 3 - Open Import Module</h2>
+                    <span class="badge {{ $selectedImportLog && $selectedImportLog->status !== 'completed' ? 'warning' : 'success' }}">
+                        {{ $selectedImportLog ? ucfirst($selectedImportLog->status) : 'Waiting for upload' }}
+                    </span>
+                </div>
+                <div class="card-body">
+                    <div class="grid cols-4 mb-4">
+                        <div class="kpi"><div class="label">Selected File</div><div class="value" style="font-size:18px;">{{ $selectedImportLog ? basename($selectedImportLog->file_name) : 'None' }}</div></div>
+                        <div class="kpi"><div class="label">Fiscal Year</div><div class="value">{{ $selectedImportLog?->fiscal_year ?? '-' }}</div></div>
+                        <div class="kpi"><div class="label">Month</div><div class="value">{{ $selectedImportLog ? ($monthNames[$selectedImportLog->month] ?? $selectedImportLog->month) : '-' }}</div></div>
+                        <div class="kpi"><div class="label">Status</div><div class="value" style="font-size:18px;">{{ $selectedImportLog ? ucfirst($selectedImportLog->status) : 'Pending' }}</div></div>
                     </div>
-                    <div class="card-body">
-                        <div class="grid cols-4 mb-4">
-                            <div class="kpi"><div class="label">Total Rows</div><div class="value">0</div></div>
-                            <div class="kpi"><div class="label">Valid</div><div class="value" style="color:#16A34A">0</div></div>
-                            <div class="kpi"><div class="label">Warnings</div><div class="value" style="color:#D97706">0</div></div>
-                            <div class="kpi"><div class="label">Errors</div><div class="value" style="color:#DC2626">0</div></div>
-                        </div>
+
+                    @if ($selectedImportLog)
+                        <div class="text-muted" style="font-size:13px; margin-bottom:16px;">Uploaded file is saved on the server. Open the import module to select this file and import it into the transactions table.</div>
+
                         <div class="flex gap-3 mt-4">
-                            <button type="button" class="btn btn-primary" id="importButton" disabled>Import to Database</button>
-                            <button type="button" class="btn btn-outline">Re-validate</button>
+                            <a href="{{ route('upload.import-module') }}" class="btn btn-primary">Open Import Module</a>
+                            <a href="{{ route('upload.create') }}" class="btn btn-outline">Reset Selection</a>
                             <a href="{{ route('dashboard') }}" class="btn btn-ghost" style="border:1px solid var(--line);">Cancel</a>
                         </div>
-                    </div>
-                </div>
-            </div>
-
-            <div>
-                <div class="card">
-                    <div class="card-head"><h2>Guidelines</h2></div>
-                    <div class="card-body" style="font-size:13.5px; color: var(--ink-soft); line-height:1.7;">
-                        <ul style="padding-left:18px; margin:0;">
-                            <li>Use the provided Excel template only.</li>
-                            <li>Do not rename or reorder columns.</li>
-                            <li>Dates must be in YYYY-MM-DD (BS).</li>
-                            <li>One file per month per fiscal year.</li>
-                            <li>Re-uploading a month replaces previous data after confirmation.</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <div class="card mt-4">
-                    <div class="card-head"><h2>Recent Uploads</h2></div>
-                    <div class="card-body" style="padding:0;">
-                        @forelse ($recentUploads as $upload)
-                            <div class="val-row"><span class="badge success">OK</span><div><strong><a href="{{ asset('storage/'.$upload->file_name) }}" target="_blank">{{ basename($upload->file_name) }}</a></strong><div class="text-muted" style="font-size:12px;">FY {{ $upload->fiscal_year }} - {{ $monthNames[$upload->month] ?? $upload->month }} - {{ $upload->created_at?->diffForHumans() }}</div></div></div>
-                        @empty
-                            <div class="val-row text-muted">No recent uploads.</div>
-                        @endforelse
-                    </div>
+                    @else
+                        <div class="text-muted" style="font-size:13px;">Upload a file in Step 2 first. After that, open the import module and choose the uploaded file.</div>
+                        <div class="flex gap-3 mt-4">
+                            <button type="button" class="btn btn-primary" disabled>Open Import Module</button>
+                            <a href="{{ route('dashboard') }}" class="btn btn-ghost" style="border:1px solid var(--line);">Cancel</a>
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>
-    </form>
+
+        <div>
+            <div class="card">
+                <div class="card-head"><h2>Guidelines</h2></div>
+                <div class="card-body" style="font-size:13.5px; color: var(--ink-soft); line-height:1.7;">
+                    <ul style="padding-left:18px; margin:0;">
+                        <li>Use the provided Excel template only.</li>
+                        <li>Do not rename or reorder columns.</li>
+                        <li>Dates must be in YYYY-MM-DD (BS).</li>
+                        <li>One file per month per fiscal year.</li>
+                        <li>Re-uploading a month replaces previous data after confirmation.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-head"><h2>Recent Uploads</h2></div>
+                <div class="card-body" style="padding:0;">
+                    @forelse ($recentUploads as $upload)
+                        <div class="val-row"><span class="badge success">OK</span><div><strong><a href="{{ asset('storage/'.$upload->file_name) }}" target="_blank">{{ basename($upload->file_name) }}</a></strong><div class="text-muted" style="font-size:12px;">FY {{ $upload->fiscal_year }} - {{ $monthNames[$upload->month] ?? $upload->month }} - {{ $upload->created_at?->diffForHumans() }}</div></div></div>
+                    @empty
+                        <div class="val-row text-muted">No recent uploads.</div>
+                    @endforelse
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -129,8 +142,6 @@
             const selectedFileName = document.getElementById('selectedFileName');
             const confirmButton = document.getElementById('confirmUploadBtn');
             const changeButton = document.getElementById('changeFileBtn');
-            const importButton = document.getElementById('importButton');
-
             const showConfirmation = () => {
                 const file = fileInput.files[0];
 
@@ -142,7 +153,6 @@
                 dropzoneTitle.textContent = file.name;
                 dropzoneText.textContent = 'File selected. Confirm upload below to save it on the server.';
                 confirmPanel.classList.remove('hide');
-                importButton.disabled = true;
             };
 
             fileInput.addEventListener('change', showConfirmation);
@@ -162,12 +172,6 @@
 
             confirmButton.addEventListener('click', () => {
                 if (fileInput.files.length) {
-                    form.submit();
-                }
-            });
-
-            importButton.addEventListener('click', () => {
-                if (fileInput.files.length && confirm('Upload this file to the server now?')) {
                     form.submit();
                 }
             });

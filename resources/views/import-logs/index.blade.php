@@ -26,6 +26,7 @@
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Month</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created By</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Import Token</th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
@@ -49,6 +50,7 @@
                                                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Failed</span>
                                             @endif
                                         </td>
+                                        <td class="px-6 py-4 text-sm text-gray-500">{{ $log->transactions()->value('import_batch_token') ?? '-' }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right space-x-2">
                                             <a href="{{ route('import-logs.edit', $log->id) }}" class="text-prabhu-red-600 hover:text-prabhu-red-900">Edit</a>
                                             <button
@@ -70,7 +72,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="8" class="px-6 py-12 text-center text-gray-500">No import logs found.</td>
+                                        <td colspan="9" class="px-6 py-12 text-center text-gray-500">No import logs found.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
