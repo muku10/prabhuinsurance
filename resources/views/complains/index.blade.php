@@ -24,6 +24,7 @@
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Received</th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Resolved</th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Pending</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Resolution (Days)</th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
@@ -35,6 +36,7 @@
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{{ $complain->received_num }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{{ $complain->resolved_num }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{{ $complain->pending_num }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{{ $complain->average_resolution_time ?? '-' }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right space-x-2">
                                             <a href="{{ route('complains.edit', $complain->id) }}" class="text-prabhu-red-600 hover:text-prabhu-red-900">Edit</a>
                                             <form action="{{ route('complains.destroy', $complain->id) }}" method="POST" class="inline" onsubmit="return confirm('Delete this complain?')">
@@ -46,7 +48,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="6" class="px-6 py-12 text-center text-gray-500">No complains found.</td>
+                                        <td colspan="7" class="px-6 py-12 text-center text-gray-500">No complains found.</td>
                                     </tr>
                                 @endforelse
                             </tbody>

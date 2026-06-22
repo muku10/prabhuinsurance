@@ -2,10 +2,10 @@
     <x-slot name="header">
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                {{ __('Branches') }} ({{ $branches->count() }})
+                {{ __('Branch Network') }} ({{ $branches->count() }})
             </h2>
             <a href="{{ route('branches.create') }}" class="inline-flex items-center px-4 py-2 bg-prabhu-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-prabhu-red-700 focus:bg-prabhu-red-700 active:bg-prabhu-red-800 focus:outline-none focus:ring-2 focus:ring-prabhu-red-500 focus:ring-offset-2 transition ease-in-out duration-150">
-                + Add Branch
+                + Add Record
             </a>
         </div>
     </x-slot>
@@ -22,7 +22,10 @@
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Province</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">District</th>
-                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Number</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fiscal Year</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Branches</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Agents</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Surveyors</th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
@@ -32,10 +35,13 @@
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $loop->iteration }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $branch->province->province_name }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $branch->district->district_name }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{{ $branch->number }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $branch->fiscal_year }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{{ $branch->number_of_branch }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{{ $branch->number_of_agents }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{{ $branch->number_of_surveyors }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right space-x-2">
                                             <a href="{{ route('branches.edit', $branch->id) }}" class="text-prabhu-red-600 hover:text-prabhu-red-900">Edit</a>
-                                            <form action="{{ route('branches.destroy', $branch->id) }}" method="POST" class="inline" onsubmit="return confirm('Delete this branch?')">
+                                            <form action="{{ route('branches.destroy', $branch->id) }}" method="POST" class="inline" onsubmit="return confirm('Delete this record?')">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="text-red-600 hover:text-red-900">Delete</button>
@@ -44,7 +50,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="px-6 py-12 text-center text-gray-500">No branches found.</td>
+                                        <td colspan="8" class="px-6 py-12 text-center text-gray-500">No branch network records found.</td>
                                     </tr>
                                 @endforelse
                             </tbody>

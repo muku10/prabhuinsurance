@@ -62,6 +62,7 @@
                             </button>
                             <a href="{{ route('upload.create') }}" class="btn btn-outline">Upload Another File</a>
                             <a href="{{ route('import-logs.index') }}" class="btn btn-ghost" style="border:1px solid var(--line);">View Upload History</a>
+                            <a href="{{ route('upload.database-history') }}" class="btn btn-ghost" style="border:1px solid var(--line);">View Import History</a>
                         </div>
                     </form>
                 </div>
@@ -72,11 +73,11 @@
             <div class="card">
                 <div class="card-head"><h2>Import Summary</h2></div>
                 <div class="card-body" style="font-size:13.5px; color: var(--ink-soft); line-height:1.7;">
-                    <ul style="padding-left:18px; margin:0;">
-                        <li>Select any uploaded file that is not yet imported.</li>
-                        <li>Fiscal year and month are read from the selected upload.</li>
-                        <li>Imported files move to the database history table below.</li>
-                        <li>If import fails, the log status changes to failed.</li>
+                    <ul style="list-style:disc outside; padding-left:22px; margin:0; display:grid; gap:6px; color:var(--brand);">
+                        <li><span style="color:var(--ink-soft);">Select any uploaded file that is not yet imported.</span></li>
+                        <li><span style="color:var(--ink-soft);">Fiscal year and month are read from the selected upload.</span></li>
+                        <li><span style="color:var(--ink-soft);">Imported files move to the database history table below.</span></li>
+                        <li><span style="color:var(--ink-soft);">If import fails, the log status changes to failed.</span></li>
                     </ul>
                 </div>
             </div>
@@ -88,7 +89,7 @@
                         <div class="val-row">
                             <span class="badge {{ $log->status === 'completed' ? 'success' : ($log->status === 'failed' ? 'danger' : 'warning') }}">{{ ucfirst($log->status) }}</span>
                             <div>
-                                <strong>{{ basename($log->file_name) }}</strong>
+                                <div style="font-size:13px; font-weight:500; color:var(--ink);">{{ basename($log->file_name) }}</div>
                                 <div class="text-muted" style="font-size:12px;">FY {{ $log->fiscal_year }} - {{ $monthNames[$log->month] ?? $log->month }}</div>
                             </div>
                         </div>
@@ -96,71 +97,6 @@
                         <div class="val-row text-muted">No pending uploaded files available.</div>
                     @endforelse
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="card mt-4">
-        <div class="card-head">
-            <h2>Database Import History</h2>
-            <div class="text-muted" style="font-size:12px;">Imported rows only</div>
-        </div>
-        <div class="card-body" style="padding:0;">
-            <div style="overflow-x:auto;">
-                <table class="t">
-                    <thead>
-                        <tr>
-                            <th>File Name</th>
-                            <th>Fiscal Year</th>
-                            <th>Month</th>
-                            <th>Rows</th>
-                            <th>Import Token</th>
-                            <th>Imported By</th>
-                            <th>Status</th>
-                            <th style="text-align:right;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($importHistory as $history)
-                            @php
-                                $historyToken = $history->transactions->first()?->import_batch_token ?? '-';
-                            @endphp
-                            <tr>
-                                <td>{{ basename($history->file_name) }}</td>
-                                <td>{{ $history->fiscal_year }}</td>
-                                <td>{{ $monthNames[$history->month] ?? $history->month }}</td>
-                                <td>{{ $history->transactions_count }}</td>
-                                <td>{{ $historyToken }}</td>
-                                <td>{{ $history->user?->full_name ?? $history->user?->email ?? 'System' }}</td>
-                                <td>
-                                    <span class="badge success">Imported</span>
-                                </td>
-                                <td style="text-align:right; white-space:nowrap;">
-                                    <button
-                                        type="button"
-                                        class="btn btn-ghost"
-                                        style="border:1px solid var(--line); color:#B91C1C;"
-                                        x-on:click="$store.confirm.askForForm({
-                                            title: 'Delete imported data',
-                                            message: `Delete imported database rows for ${@js(basename($history->file_name))}? The uploaded file will remain available.`,
-                                            confirmText: 'Delete imported rows',
-                                            cancelText: 'Cancel',
-                                            formId: 'delete-imported-data-{{ $history->id }}'
-                                        })"
-                                    >Delete</button>
-                                    <form id="delete-imported-data-{{ $history->id }}" method="POST" action="{{ route('upload.import-module.destroy', $history->id) }}" class="hidden">
-                                        @csrf
-                                        @method('DELETE')
-                                    </form>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="8" class="text-muted" style="text-align:center; padding:24px;">No database import history available.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
             </div>
         </div>
     </div>

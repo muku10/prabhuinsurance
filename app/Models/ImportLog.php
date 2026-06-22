@@ -33,4 +33,14 @@ class ImportLog extends Model
     {
         return $this->hasMany(Transaction::class);
     }
+
+    public function branches(): HasMany
+    {
+        return $this->hasMany(Branch::class);
+    }
+
+    public function complains(): HasMany
+    {
+        return $this->hasMany(Complain::class);
+    }
 }

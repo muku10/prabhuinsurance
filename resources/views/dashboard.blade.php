@@ -58,7 +58,7 @@
                         <tbody>
                             @forelse ($recentUploads as $upload)
                                 <tr>
-                                    <td>{{ $upload->file_name }}</td>
+                                    <td>{{ basename($upload->file_name) }}</td>
                                     <td>{{ $upload->fiscal_year }}</td>
                                     <td>{{ $monthNames[$upload->month] ?? $upload->month }}</td>
                                     <td>{{ $upload->created_at->diffForHumans() }}</td>

@@ -53,6 +53,11 @@
                             </div>
                         </div>
                         <div class="mb-4">
+                            <x-input-label for="average_resolution_time" :value="__('Average Resolution Time (Days)')" />
+                            <x-text-input id="average_resolution_time" class="block mt-1 w-full" type="number" name="average_resolution_time" :value="old('average_resolution_time', $complain->average_resolution_time)" min="0" step="0.01" />
+                            <x-input-error :messages="$errors->get('average_resolution_time')" class="mt-2" />
+                        </div>
+                        <div class="mb-4">
                             <x-input-label for="status" :value="__('Status')" />
                             <select id="status" name="status" class="mt-1 block w-full border-gray-300 focus:border-prabhu-red-500 focus:ring-prabhu-red-500 rounded-md shadow-sm" required>
                                 <option value="active" {{ old('status', $complain->status) === 'active' ? 'selected' : '' }}>Active</option>

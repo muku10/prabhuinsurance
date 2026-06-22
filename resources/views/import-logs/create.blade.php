@@ -79,7 +79,7 @@
                 </div>
                 <div class="card-body">
                     <div class="grid cols-4 mb-4">
-                        <div class="kpi"><div class="label">Selected File</div><div class="value" style="font-size:18px;">{{ $selectedImportLog ? basename($selectedImportLog->file_name) : 'None' }}</div></div>
+                        <div class="kpi"><div class="label">Selected File</div><div class="value" style="font-size:13px; font-weight:500; line-height:1.4; overflow-wrap:anywhere;">{{ $selectedImportLog ? basename($selectedImportLog->file_name) : 'None' }}</div></div>
                         <div class="kpi"><div class="label">Fiscal Year</div><div class="value">{{ $selectedImportLog?->fiscal_year ?? '-' }}</div></div>
                         <div class="kpi"><div class="label">Month</div><div class="value">{{ $selectedImportLog ? ($monthNames[$selectedImportLog->month] ?? $selectedImportLog->month) : '-' }}</div></div>
                         <div class="kpi"><div class="label">Status</div><div class="value" style="font-size:18px;">{{ $selectedImportLog ? ucfirst($selectedImportLog->status) : 'Pending' }}</div></div>
@@ -108,12 +108,12 @@
             <div class="card">
                 <div class="card-head"><h2>Guidelines</h2></div>
                 <div class="card-body" style="font-size:13.5px; color: var(--ink-soft); line-height:1.7;">
-                    <ul style="padding-left:18px; margin:0;">
-                        <li>Use the provided Excel template only.</li>
-                        <li>Do not rename or reorder columns.</li>
-                        <li>Dates must be in YYYY-MM-DD (BS).</li>
-                        <li>One file per month per fiscal year.</li>
-                        <li>Re-uploading a month replaces previous data after confirmation.</li>
+                    <ul style="list-style:disc outside; padding-left:22px; margin:0; display:grid; gap:6px; color:var(--brand);">
+                        <li><span style="color:var(--ink-soft);">Use the provided Excel template only.</span></li>
+                        <li><span style="color:var(--ink-soft);">Do not rename or reorder columns.</span></li>
+                        <li><span style="color:var(--ink-soft);">Dates must be in YYYY-MM-DD (BS).</span></li>
+                        <li><span style="color:var(--ink-soft);">One file per month per fiscal year.</span></li>
+                        <li><span style="color:var(--ink-soft);">Re-uploading a month replaces previous data after confirmation.</span></li>
                     </ul>
                 </div>
             </div>
@@ -122,7 +122,7 @@
                 <div class="card-head"><h2>Recent Uploads</h2></div>
                 <div class="card-body" style="padding:0;">
                     @forelse ($recentUploads as $upload)
-                        <div class="val-row"><span class="badge success">OK</span><div><strong><a href="{{ asset('storage/'.$upload->file_name) }}" target="_blank">{{ basename($upload->file_name) }}</a></strong><div class="text-muted" style="font-size:12px;">FY {{ $upload->fiscal_year }} - {{ $monthNames[$upload->month] ?? $upload->month }} - {{ $upload->created_at?->diffForHumans() }}</div></div></div>
+                        <div class="val-row"><span class="badge success">OK</span><div><a href="{{ asset('storage/'.$upload->file_name) }}" target="_blank" style="font-size:13px; font-weight:500; color:var(--ink);">{{ basename($upload->file_name) }}</a><div class="text-muted" style="font-size:12px;">FY {{ $upload->fiscal_year }} - {{ $monthNames[$upload->month] ?? $upload->month }} - {{ $upload->created_at?->diffForHumans() }}</div></div></div>
                     @empty
                         <div class="val-row text-muted">No recent uploads.</div>
                     @endforelse

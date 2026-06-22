@@ -31,6 +31,7 @@ class ComplainController extends Controller
             'received_num' => ['required', 'integer', 'min:0'],
             'resolved_num' => ['required', 'integer', 'min:0'],
             'pending_num' => ['required', 'integer', 'min:0'],
+            'average_resolution_time' => ['nullable', 'numeric', 'min:0'],
             'status' => ['required', 'in:active,inactive'],
         ]);
 
@@ -56,6 +57,7 @@ class ComplainController extends Controller
             'received_num' => ['required', 'integer', 'min:0'],
             'resolved_num' => ['required', 'integer', 'min:0'],
             'pending_num' => ['required', 'integer', 'min:0'],
+            'average_resolution_time' => ['nullable', 'numeric', 'min:0'],
             'status' => ['required', 'in:active,inactive'],
         ]);
 

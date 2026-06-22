@@ -2,10 +2,10 @@
     <x-slot name="header">
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                {{ __('Edit Branch') }}
+                {{ __('Edit Branch Network Record') }}
             </h2>
             <a href="{{ route('branches.index') }}" class="inline-flex items-center px-4 py-2 bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition ease-in-out duration-150">
-                Back to Branches
+                Back to Branch Network
             </a>
         </div>
     </x-slot>
@@ -38,21 +38,33 @@
                             </select>
                             <x-input-error :messages="$errors->get('district_id')" class="mt-2" />
                         </div>
-                        <div class="grid grid-cols-3 gap-4 mb-4">
+                        <div class="grid grid-cols-2 gap-4 mb-4">
                             <div>
-                                <x-input-label for="year" :value="__('Year')" />
-                                <x-text-input id="year" class="block mt-1 w-full" type="number" name="year" :value="old('year', $branch->year)" required min="2000" max="2100" />
-                                <x-input-error :messages="$errors->get('year')" class="mt-2" />
+                                <x-input-label for="fiscal_year" :value="__('Fiscal Year')" />
+                                <x-text-input id="fiscal_year" class="block mt-1 w-full" type="text" name="fiscal_year" :value="old('fiscal_year', $branch->fiscal_year)" required placeholder="e.g. 2082-83" />
+                                <x-input-error :messages="$errors->get('fiscal_year')" class="mt-2" />
                             </div>
                             <div>
                                 <x-input-label for="month" :value="__('Month')" />
                                 <x-text-input id="month" class="block mt-1 w-full" type="number" name="month" :value="old('month', $branch->month)" required min="1" max="12" />
                                 <x-input-error :messages="$errors->get('month')" class="mt-2" />
                             </div>
+                        </div>
+                        <div class="grid grid-cols-3 gap-4 mb-4">
                             <div>
-                                <x-input-label for="number" :value="__('Number')" />
-                                <x-text-input id="number" class="block mt-1 w-full" type="number" name="number" :value="old('number', $branch->number)" required min="0" />
-                                <x-input-error :messages="$errors->get('number')" class="mt-2" />
+                                <x-input-label for="number_of_branch" :value="__('Number of Branch')" />
+                                <x-text-input id="number_of_branch" class="block mt-1 w-full" type="number" name="number_of_branch" :value="old('number_of_branch', $branch->number_of_branch)" required min="0" />
+                                <x-input-error :messages="$errors->get('number_of_branch')" class="mt-2" />
+                            </div>
+                            <div>
+                                <x-input-label for="number_of_agents" :value="__('Number of Agents')" />
+                                <x-text-input id="number_of_agents" class="block mt-1 w-full" type="number" name="number_of_agents" :value="old('number_of_agents', $branch->number_of_agents)" required min="0" />
+                                <x-input-error :messages="$errors->get('number_of_agents')" class="mt-2" />
+                            </div>
+                            <div>
+                                <x-input-label for="number_of_surveyors" :value="__('Number of Surveyors')" />
+                                <x-text-input id="number_of_surveyors" class="block mt-1 w-full" type="number" name="number_of_surveyors" :value="old('number_of_surveyors', $branch->number_of_surveyors)" required min="0" />
+                                <x-input-error :messages="$errors->get('number_of_surveyors')" class="mt-2" />
                             </div>
                         </div>
                         <div class="mb-4">

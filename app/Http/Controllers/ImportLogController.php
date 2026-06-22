@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Branch;
+use App\Models\Complain;
 use App\Models\District;
 use App\Models\ImportLog;
 use App\Models\Policy;
@@ -18,12 +20,44 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ImportLogController extends Controller
 {
-    public function index(): View
-    {
-        $importLogs = ImportLog::with('user')->latest('date')->get();
-        $monthNames = $this->bsMonthNames();
+    private const SHEET_TRANSACTIONS = 0;
+    private const SHEET_COMPLAINS = 1;
+    private const SHEET_BRANCH_NETWORK = 2;
 
-        return view('import-logs.index', compact('importLogs', 'monthNames'));
+    public function index(Request $request): View
+    {
+        $monthNames = $this->bsMonthNames();
+        $fiscalYears = ImportLog::select('fiscal_year')->distinct()->orderByDesc('fiscal_year')->pluck('fiscal_year');
+        $selectedFiscalYear = $request->string('fiscal_year')->toString();
+        $selectedMonth = $request->integer('month') ?: null;
+
+        $importLogs = ImportLog::with('user')
+            ->when($selectedFiscalYear !== '', fn ($query) => $query->where('fiscal_year', $selectedFiscalYear))
+            ->when($selectedMonth, fn ($query) => $query->where('month', $selectedMonth))
+            ->latest('date')
+            ->latest('id')
+            ->get();
+
+        return view('import-logs.index', compact('importLogs', 'monthNames', 'fiscalYears', 'selectedFiscalYear', 'selectedMonth'));
+    }
+
+    public function databaseHistory(Request $request): View
+    {
+        $monthNames = $this->bsMonthNames();
+        $fiscalYears = ImportLog::where('status', 'completed')->select('fiscal_year')->distinct()->orderByDesc('fiscal_year')->pluck('fiscal_year');
+        $selectedFiscalYear = $request->string('fiscal_year')->toString();
+        $selectedMonth = $request->integer('month') ?: null;
+
+        $importHistory = ImportLog::with(['user', 'transactions', 'complains', 'branches'])
+            ->withCount(['transactions', 'complains', 'branches'])
+            ->where('status', 'completed')
+            ->when($selectedFiscalYear !== '', fn ($query) => $query->where('fiscal_year', $selectedFiscalYear))
+            ->when($selectedMonth, fn ($query) => $query->where('month', $selectedMonth))
+            ->latest('date')
+            ->latest('id')
+            ->get();
+
+        return view('import-logs.database-history', compact('importHistory', 'monthNames', 'fiscalYears', 'selectedFiscalYear', 'selectedMonth'));
     }
 
     public function create(): View
@@ -49,19 +83,12 @@ class ImportLogController extends Controller
     public function importModule(): View
     {
         $monthNames = $this->bsMonthNames();
-        $availableImportLogs = ImportLog::whereDoesntHave('transactions')
+        $availableImportLogs = ImportLog::where('status', '!=', 'completed')
             ->latest('date')
             ->latest('id')
             ->get();
         $selectedImportLog = $availableImportLogs->firstWhere('id', session('selected_import_log_id')) ?? $availableImportLogs->first();
-        $importHistory = ImportLog::with(['user', 'transactions'])
-            ->withCount('transactions')
-            ->whereHas('transactions')
-            ->latest('date')
-            ->latest('id')
-            ->get();
-
-        return view('import-logs.import', compact('availableImportLogs', 'monthNames', 'selectedImportLog', 'importHistory'));
+        return view('import-logs.import', compact('availableImportLogs', 'monthNames', 'selectedImportLog'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -175,18 +202,24 @@ class ImportLogController extends Controller
 
     public function destroyImportedData(ImportLog $importLog): RedirectResponse
     {
-        $deletedRows = 0;
+        $deletedTransactions = 0;
+        $deletedComplains = 0;
+        $deletedBranches = 0;
 
-        DB::transaction(function () use ($importLog, &$deletedRows) {
-            $deletedRows = Transaction::where('import_log_id', $importLog->id)->delete();
+        DB::transaction(function () use ($importLog, &$deletedTransactions, &$deletedComplains, &$deletedBranches) {
+            $deletedTransactions = Transaction::where('import_log_id', $importLog->id)->delete();
+            $deletedComplains = Complain::where('import_log_id', $importLog->id)->delete();
+            $deletedBranches = Branch::where('import_log_id', $importLog->id)->delete();
             $importLog->update(['status' => 'pending']);
         });
 
+        $totalDeleted = $deletedTransactions + $deletedComplains + $deletedBranches;
+
         return redirect()->route('upload.import-module')->with('toast', [
-            'message' => $deletedRows > 0
-                ? 'Imported database rows deleted successfully. The uploaded file is still available for re-import.'
+            'message' => $totalDeleted > 0
+                ? "Imported data deleted: {$deletedTransactions} transactions, {$deletedComplains} complains, {$deletedBranches} branch network records. The uploaded file is still available for re-import."
                 : 'No imported database rows were found for this file.',
-            'type' => $deletedRows > 0 ? 'success' : 'warning',
+            'type' => $totalDeleted > 0 ? 'success' : 'warning',
         ]);
     }
 
@@ -205,16 +238,50 @@ class ImportLogController extends Controller
             DB::transaction(function () use ($importLog) {
                 $importLog->update(['status' => 'processing']);
 
-                Transaction::where('import_log_id', $importLog->id)->delete();
+                $filePath = Storage::disk('public')->path($importLog->file_name);
+                $spreadsheet = IOFactory::load($filePath);
+                $sheetCount = $spreadsheet->getSheetCount();
 
                 $importBatchToken = (string) Str::uuid();
-                $transactions = $this->buildTransactionsFromUpload($importLog, $importLog->fiscal_year, (int) $importLog->month, $importBatchToken);
+                $totalImported = 0;
 
-                if (empty($transactions)) {
-                    throw new \RuntimeException('No valid transaction rows were found in the uploaded file.');
+                // Sheet 0: Transactions
+                Transaction::where('import_log_id', $importLog->id)->delete();
+                $spreadsheet->setActiveSheetIndex(self::SHEET_TRANSACTIONS);
+                $transactions = $this->buildTransactionsFromUpload($spreadsheet, $importLog, $importLog->fiscal_year, (int) $importLog->month, $importBatchToken);
+
+                if (! empty($transactions)) {
+                    Transaction::insert($transactions);
+                    $totalImported += count($transactions);
                 }
 
-                Transaction::insert($transactions);
+                // Sheet 1: Complains (if present)
+                if ($sheetCount > self::SHEET_COMPLAINS) {
+                    Complain::where('import_log_id', $importLog->id)->delete();
+                    $spreadsheet->setActiveSheetIndex(self::SHEET_COMPLAINS);
+                    $complains = $this->buildComplainsFromUpload($spreadsheet, $importLog, $importLog->fiscal_year, (int) $importLog->month);
+
+                    if (! empty($complains)) {
+                        Complain::insert($complains);
+                        $totalImported += count($complains);
+                    }
+                }
+
+                // Sheet 2: Branch Network (if present)
+                if ($sheetCount > self::SHEET_BRANCH_NETWORK) {
+                    Branch::where('import_log_id', $importLog->id)->delete();
+                    $spreadsheet->setActiveSheetIndex(self::SHEET_BRANCH_NETWORK);
+                    $branches = $this->buildBranchesFromUpload($spreadsheet, $importLog);
+
+                    if (! empty($branches)) {
+                        Branch::insert($branches);
+                        $totalImported += count($branches);
+                    }
+                }
+
+                if ($totalImported === 0) {
+                    throw new \RuntimeException('No valid data rows were found in any sheet of the uploaded file.');
+                }
 
                 $importLog->update(['status' => 'completed']);
             });
@@ -231,22 +298,21 @@ class ImportLogController extends Controller
         return redirect()->route($redirectRoute)
             ->with('selected_import_log_id', $importLog->id)
             ->with('toast', [
-                'message' => 'Transactions imported into the database successfully.',
+                'message' => 'Data imported into the database successfully.',
                 'type' => 'success',
             ]);
     }
 
-    private function buildTransactionsFromUpload(ImportLog $importLog, string $fiscalYear, int $selectedMonth, string $importBatchToken): array
+    private function buildTransactionsFromUpload($spreadsheet, ImportLog $importLog, string $fiscalYear, int $selectedMonth, string $importBatchToken): array
     {
-        $filePath = Storage::disk('public')->path($importLog->file_name);
-        $worksheet = IOFactory::load($filePath)->getActiveSheet();
+        $worksheet = $spreadsheet->getActiveSheet();
         $rows = $worksheet->toArray(null, true, true, false);
 
         if (count($rows) < 2) {
             return [];
         }
 
-        $headerIndex = $this->findHeaderRowIndex($rows);
+        $headerIndex = $this->findTransactionHeaderRowIndex($rows);
 
         if ($headerIndex === null) {
             throw new \RuntimeException('The uploaded file is missing the required transaction headers.');
@@ -307,7 +373,7 @@ class ImportLogController extends Controller
         return $transactions;
     }
 
-    private function findHeaderRowIndex(array $rows): ?int
+    private function findTransactionHeaderRowIndex(array $rows): ?int
     {
         $requiredHeaders = [
             'stateid',
@@ -350,6 +416,191 @@ class ImportLogController extends Controller
         return count(array_filter($requiredIds, fn ($value) => $value !== null)) === count($requiredIds);
     }
 
+    private function buildComplainsFromUpload($spreadsheet, ImportLog $importLog, string $fiscalYear, int $selectedMonth): array
+    {
+        $worksheet = $spreadsheet->getActiveSheet();
+        $rows = $worksheet->toArray(null, true, true, false);
+
+        if (count($rows) < 2) {
+            return [];
+        }
+
+        $headerIndex = $this->findComplainHeaderRowIndex($rows);
+
+        if ($headerIndex === null) {
+            return [];
+        }
+
+        $headers = array_map(fn ($value) => $this->normalizeHeader((string) $value), $rows[$headerIndex]);
+        $complains = [];
+        $timestamp = now();
+
+        foreach (array_slice($rows, $headerIndex + 1) as $row) {
+            $mappedRow = [];
+
+            foreach ($headers as $index => $header) {
+                if ($header === '') {
+                    continue;
+                }
+
+                $mappedRow[$header] = $row[$index] ?? null;
+            }
+
+            $complainType = $this->nullableString($mappedRow['complaint_type'] ?? $mappedRow['complain_type'] ?? $mappedRow['complaintype'] ?? null);
+
+            if ($complainType === null) {
+                continue;
+            }
+
+            $receivedNum = $this->numericInteger($mappedRow['received_num'] ?? $mappedRow['receivednum'] ?? null);
+            $resolvedNum = $this->numericInteger($mappedRow['resolved_num'] ?? $mappedRow['resolvednum'] ?? null);
+            $pendingNum = $this->numericInteger($mappedRow['pending_num'] ?? $mappedRow['pendingnum'] ?? null);
+
+            if ($receivedNum === 0 && $resolvedNum === 0 && $pendingNum === 0) {
+                continue;
+            }
+
+            $complains[] = [
+                'import_log_id' => $importLog->id,
+                'year' => $this->nullableInteger($mappedRow['year'] ?? null) ?? (int) substr($fiscalYear, 0, 4),
+                'month' => $this->nullableInteger($mappedRow['month'] ?? null) ?? $selectedMonth,
+                'complain_type' => $complainType,
+                'received_num' => $receivedNum,
+                'resolved_num' => $resolvedNum,
+                'pending_num' => $pendingNum,
+                'average_resolution_time' => $this->nullableDecimal($mappedRow['average_resolution_time'] ?? $mappedRow['averageresolutiontime'] ?? null),
+                'created_at' => $timestamp,
+                'updated_at' => $timestamp,
+            ];
+        }
+
+        return $complains;
+    }
+
+    private function findComplainHeaderRowIndex(array $rows): ?int
+    {
+        $requiredHeaders = [
+            'complaintype',
+            'receivednum',
+            'resolvednum',
+            'pendingnum',
+        ];
+
+        // Also accept alternate header names
+        $alternateHeaders = [
+            'complaint_type',
+            'received_num',
+            'resolved_num',
+            'pending_num',
+        ];
+
+        foreach ($rows as $index => $row) {
+            $normalizedRow = array_map(fn ($value) => $this->normalizeHeader((string) $value), $row);
+
+            if (empty(array_diff($requiredHeaders, $normalizedRow)) || empty(array_diff($alternateHeaders, $normalizedRow))) {
+                return $index;
+            }
+        }
+
+        return null;
+    }
+
+    private function buildBranchesFromUpload($spreadsheet, ImportLog $importLog): array
+    {
+        $worksheet = $spreadsheet->getActiveSheet();
+        $rows = $worksheet->toArray(null, true, true, false);
+
+        if (count($rows) < 2) {
+            return [];
+        }
+
+        $headerIndex = $this->findBranchHeaderRowIndex($rows);
+
+        if ($headerIndex === null) {
+            return [];
+        }
+
+        $headers = array_map(fn ($value) => $this->normalizeHeader((string) $value), $rows[$headerIndex]);
+        $branches = [];
+        $timestamp = now();
+        $validProvinceIds = Province::query()->pluck('province_id')->flip();
+        $validDistrictIds = District::query()->pluck('district_id')->flip();
+
+        foreach (array_slice($rows, $headerIndex + 1) as $row) {
+            $mappedRow = [];
+
+            foreach ($headers as $index => $header) {
+                if ($header === '') {
+                    continue;
+                }
+
+                $mappedRow[$header] = $row[$index] ?? null;
+            }
+
+            $provinceId = $this->sanitizeForeignKey($mappedRow['province_id'] ?? $mappedRow['provinceid'] ?? null, $validProvinceIds);
+            $districtId = $this->sanitizeForeignKey($mappedRow['district_id'] ?? $mappedRow['districtid'] ?? null, $validDistrictIds);
+
+            // Skip rows without valid province/district
+            if ($provinceId === null && $districtId === null) {
+                continue;
+            }
+
+            $numberOfBranch = $this->numericInteger($mappedRow['number_of_branch'] ?? $mappedRow['numberofbranch'] ?? null);
+            $numberOfAgents = $this->numericInteger($mappedRow['number_of_agents'] ?? $mappedRow['numberofagents'] ?? null);
+            $numberOfSurveyors = $this->numericInteger($mappedRow['number_of_surveyors'] ?? $mappedRow['numberofsurveyors'] ?? null);
+
+            if ($numberOfBranch === 0 && $numberOfAgents === 0 && $numberOfSurveyors === 0) {
+                continue;
+            }
+
+            $branches[] = [
+                'import_log_id' => $importLog->id,
+                'province_id' => $provinceId,
+                'district_id' => $districtId,
+                'fiscal_year' => $this->nullableString($mappedRow['fiscal_year'] ?? $mappedRow['fiscalyear'] ?? null) ?? $importLog->fiscal_year,
+                'year' => $this->nullableInteger($mappedRow['year'] ?? null) ?? (int) substr($importLog->fiscal_year, 0, 4),
+                'month' => $this->nullableInteger($mappedRow['month'] ?? null) ?? (int) $importLog->month,
+                'number_of_branch' => $numberOfBranch,
+                'number_of_agents' => $numberOfAgents,
+                'number_of_surveyors' => $numberOfSurveyors,
+                'status' => 'active',
+                'created_at' => $timestamp,
+                'updated_at' => $timestamp,
+            ];
+        }
+
+        return $branches;
+    }
+
+    private function findBranchHeaderRowIndex(array $rows): ?int
+    {
+        $requiredHeaders = [
+            'provinceid',
+            'districtid',
+            'numberofbranch',
+            'numberofagents',
+            'numberofsurveyors',
+        ];
+
+        $alternateHeaders = [
+            'province_id',
+            'district_id',
+            'number_of_branch',
+            'number_of_agents',
+            'number_of_surveyors',
+        ];
+
+        foreach ($rows as $index => $row) {
+            $normalizedRow = array_map(fn ($value) => $this->normalizeHeader((string) $value), $row);
+
+            if (empty(array_diff($requiredHeaders, $normalizedRow)) || empty(array_diff($alternateHeaders, $normalizedRow))) {
+                return $index;
+            }
+        }
+
+        return null;
+    }
+
     private function normalizeHeader(string $header): string
     {
         return strtolower(preg_replace('/[^a-z0-9]+/i', '', trim($header)) ?? '');
@@ -373,6 +624,15 @@ class ImportLogController extends Controller
     {
         if ($value === null || trim((string) $value) === '') {
             return 0;
+        }
+
+        return round((float) str_replace(',', '', (string) $value), 2);
+    }
+
+    private function nullableDecimal(mixed $value): ?float
+    {
+        if ($value === null || trim((string) $value) === '') {
+            return null;
         }
 
         return round((float) str_replace(',', '', (string) $value), 2);
@@ -464,6 +724,7 @@ class ImportLogController extends Controller
 
         return $period['year'].' '.$monthName.' '.$day;
     }
+
     private function bsMonthNames(): array
     {
         return [

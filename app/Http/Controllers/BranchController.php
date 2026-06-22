@@ -14,7 +14,7 @@ class BranchController extends Controller
     public function index(): View
     {
         $branches = Branch::with(['province', 'district'])
-            ->orderBy('year', 'desc')
+            ->orderBy('fiscal_year', 'desc')
             ->orderBy('month', 'desc')
             ->get();
         return view('branches.index', compact('branches'));
@@ -32,16 +32,18 @@ class BranchController extends Controller
         $validated = $request->validate([
             'province_id' => ['required', 'exists:provinces,province_id'],
             'district_id' => ['required', 'exists:districts,district_id'],
-            'year' => ['required', 'integer', 'min:2000', 'max:2100'],
+            'fiscal_year' => ['required', 'string', 'max:255'],
             'month' => ['required', 'integer', 'min:1', 'max:12'],
-            'number' => ['required', 'integer', 'min:0'],
+            'number_of_branch' => ['required', 'integer', 'min:0'],
+            'number_of_agents' => ['required', 'integer', 'min:0'],
+            'number_of_surveyors' => ['required', 'integer', 'min:0'],
             'status' => ['required', 'in:active,inactive'],
         ]);
 
         Branch::create($validated);
 
         return redirect()->route('branches.index')->with('toast', [
-            'message' => 'Branch created successfully.',
+            'message' => 'Branch Network record created successfully.',
             'type' => 'success',
         ]);
     }
@@ -58,16 +60,18 @@ class BranchController extends Controller
         $validated = $request->validate([
             'province_id' => ['required', 'exists:provinces,province_id'],
             'district_id' => ['required', 'exists:districts,district_id'],
-            'year' => ['required', 'integer', 'min:2000', 'max:2100'],
+            'fiscal_year' => ['required', 'string', 'max:255'],
             'month' => ['required', 'integer', 'min:1', 'max:12'],
-            'number' => ['required', 'integer', 'min:0'],
+            'number_of_branch' => ['required', 'integer', 'min:0'],
+            'number_of_agents' => ['required', 'integer', 'min:0'],
+            'number_of_surveyors' => ['required', 'integer', 'min:0'],
             'status' => ['required', 'in:active,inactive'],
         ]);
 
         $branch->update($validated);
 
         return redirect()->route('branches.index')->with('toast', [
-            'message' => 'Branch updated successfully.',
+            'message' => 'Branch Network record updated successfully.',
             'type' => 'success',
         ]);
     }
@@ -77,7 +81,7 @@ class BranchController extends Controller
         $branch->delete();
 
         return redirect()->route('branches.index')->with('toast', [
-            'message' => 'Branch deleted successfully.',
+            'message' => 'Branch Network record deleted successfully.',
             'type' => 'success',
         ]);
     }
