@@ -6,6 +6,7 @@
         <a href="#" data-tab="prov" class="active">Provinces</a>
         <a href="#" data-tab="dist">Districts</a>
         <a href="#" data-tab="pt">Policy Types</a>
+        <a href="#" data-tab="ct">Complain Types</a>
         <a href="#" data-tab="conf">Configuration</a>
     </nav>
 
@@ -16,13 +17,12 @@
         </div>
         <div class="table-wrap">
             <table class="t">
-                <thead><tr><th>#</th><th>Name</th><th>Code</th><th>Districts</th><th>Branches</th><th class="text-right">Actions</th></tr></thead>
+                <thead><tr><th>ID</th><th>Name</th><th>Districts</th><th>Branches</th><th class="text-right">Actions</th></tr></thead>
                 <tbody>
                     @forelse ($provinces as $province)
                         <tr>
-                            <td>{{ $loop->iteration }}</td>
+                            <td>{{ $province->province_id }}</td>
                             <td>{{ $province->province_name }}</td>
-                            <td>{{ $province->code }}</td>
                             <td>{{ $province->districts_count }}</td>
                             <td class="num">{{ $province->branches_count }}</td>
                             <td class="text-right">
@@ -35,7 +35,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="text-muted">No provinces found.</td></tr>
+                        <tr><td colspan="5" class="text-muted">No provinces found.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -49,14 +49,13 @@
         </div>
         <div class="table-wrap">
             <table class="t">
-                <thead><tr><th>#</th><th>District</th><th>Province</th><th>Code</th><th>Branches</th><th class="text-right">Actions</th></tr></thead>
+                <thead><tr><th>ID</th><th>District</th><th>Province</th><th>Branches</th><th class="text-right">Actions</th></tr></thead>
                 <tbody>
                     @forelse ($districts as $district)
                         <tr>
-                            <td>{{ $loop->iteration }}</td>
+                            <td>{{ $district->district_id }}</td>
                             <td>{{ $district->district_name }}</td>
                             <td>{{ $district->province->province_name }}</td>
-                            <td>{{ $district->code }}</td>
                             <td class="num">{{ $district->branches_count }}</td>
                             <td class="text-right">
                                 <a href="{{ route('districts.edit', $district->district_id) }}" class="btn btn-ghost btn-sm">Edit</a>
@@ -68,7 +67,7 @@
                             </td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="text-muted">No districts found.</td></tr>
+                        <tr><td colspan="5" class="text-muted">No districts found.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -82,18 +81,38 @@
         </div>
         <div class="table-wrap">
             <table class="t">
-                <thead><tr><th>#</th><th>Policy Type</th><th>Code</th><th>Active</th><th class="text-right">Actions</th></tr></thead>
+                <thead><tr><th>ID</th><th>Policy Type</th><th>Active</th><th class="text-right">Actions</th></tr></thead>
                 <tbody>
                     @forelse ($policies as $policy)
                         <tr>
-                            <td>{{ $loop->iteration }}</td>
+                            <td>{{ $policy->policy_id }}</td>
                             <td>{{ $policy->policy_name }}</td>
-                            <td>{{ $policy->code }}</td>
                             <td><span class="badge {{ $policy->status === 'active' ? 'success' : 'danger' }}">{{ $policy->status === 'active' ? 'Yes' : 'No' }}</span></td>
                             <td class="text-right"><a href="{{ route('policies.edit', $policy->policy_id) }}" class="btn btn-ghost btn-sm">Edit</a></td>
                         </tr>
                     @empty
-                        <tr><td colspan="5" class="text-muted">No policy types found.</td></tr>
+                        <tr><td colspan="4" class="text-muted">No policy types found.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div data-tab-panel="ct" class="hide">
+        <div class="flex between center mb-3">
+            <h2 style="margin:0; font-size:16px;">Complain Types ({{ $complainTypes->count() }})</h2>
+        </div>
+        <div class="table-wrap">
+            <table class="t">
+                <thead><tr><th>ID</th><th>Name</th></tr></thead>
+                <tbody>
+                    @forelse ($complainTypes as $complainType)
+                        <tr>
+                            <td>{{ $complainType->id }}</td>
+                            <td>{{ $complainType->name }}</td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="2" class="text-muted">No complain types found.</td></tr>
                     @endforelse
                 </tbody>
             </table>

@@ -13,6 +13,7 @@ use App\Models\District;
 use App\Models\ImportLog;
 use App\Models\Policy;
 use App\Models\Province;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -77,11 +78,12 @@ Route::middleware('auth')->group(function () {
     Route::get('/database-import-history', [ImportLogController::class, 'databaseHistory'])->name('upload.database-history');
 
     Route::get('/master-data', function () {
-        $provinces = Province::withCount(['districts', 'branches'])->orderBy('province_name')->get();
-        $districts = District::with('province')->withCount('branches')->orderBy('district_name')->get();
-        $policies = Policy::orderBy('policy_name')->get();
+        $provinces = Province::withCount(['districts', 'branches'])->orderBy('province_id')->get();
+        $districts = District::with('province')->withCount('branches')->orderBy('district_id')->get();
+        $policies = Policy::orderBy('policy_id')->get();
+        $complainTypes = DB::table('complain_types')->orderBy('id')->get();
 
-        return view('master-data.index', compact('provinces', 'districts', 'policies'));
+        return view('master-data.index', compact('provinces', 'districts', 'policies', 'complainTypes'));
     })->name('master-data.index');
 
     Route::resource('users', UserController::class)->except(['show', 'create', 'store']);
