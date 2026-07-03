@@ -31,7 +31,7 @@ class ProvinceController extends Controller
 
         Province::create($validated);
 
-        return redirect()->route('provinces.index')->with('toast', [
+        return redirect()->route('master-data.index')->with('toast', [
             'message' => 'Province created successfully.',
             'type' => 'success',
         ]);
@@ -51,7 +51,7 @@ class ProvinceController extends Controller
 
         $province->update($validated);
 
-        return redirect()->route('provinces.index')->with('toast', [
+        return redirect()->route('master-data.index')->with('toast', [
             'message' => 'Province updated successfully.',
             'type' => 'success',
         ]);
@@ -61,7 +61,7 @@ class ProvinceController extends Controller
     {
         $province->delete();
 
-        return redirect()->route('provinces.index')->with('toast', [
+        return redirect()->route('master-data.index')->with('toast', [
             'message' => 'Province deleted successfully.',
             'type' => 'success',
         ]);

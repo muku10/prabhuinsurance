@@ -11,6 +11,7 @@ class Policy extends Model
     protected $primaryKey = 'policy_id';
 
     protected $fillable = [
+        'policy_id',
         'parent_id',
         'policy_name',
         'policy_name_np',

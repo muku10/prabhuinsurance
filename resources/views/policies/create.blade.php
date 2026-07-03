@@ -1,54 +1,78 @@
 <x-app-layout>
-    <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                {{ __('Add Policy Type') }}
-            </h2>
-            <a href="{{ route('policies.index') }}" class="inline-flex items-center px-4 py-2 bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition ease-in-out duration-150">
-                Back to Policy Types
-            </a>
-        </div>
-    </x-slot>
+    <x-slot name="title">Add Policy Type</x-slot>
+    <x-slot name="crumbs">Master Data · Policy Types · Add</x-slot>
 
-    <div class="py-12">
-        <div class="max-w-2xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="border-t-4 border-prabhu-red-600"></div>
-                <div class="p-6">
+    <div class="grid cols-3 mb-6">
+        <div style="grid-column: span 2;">
+            <div class="card">
+                <div class="card-head">
+                    <h2>Add Policy Type</h2>
+                    <a href="{{ route('master-data.index') }}" class="btn btn-outline btn-sm">Back to Master Data</a>
+                </div>
+                <div class="card-body">
                     <form method="POST" action="{{ route('policies.store') }}">
                         @csrf
-                        <div class="mb-4">
-                            <x-input-label for="parent_id" :value="__('Parent Policy (optional)')" />
-                            <select id="parent_id" name="parent_id" class="mt-1 block w-full border-gray-300 focus:border-prabhu-red-500 focus:ring-prabhu-red-500 rounded-md shadow-sm">
+                        <div class="field mb-4">
+                            <label for="policy_id">Policy ID</label>
+                            <input class="input" id="policy_id" type="number" name="policy_id" value="{{ old('policy_id') }}" required min="1" placeholder="Enter a unique policy ID">
+                            @error('policy_id')
+                                <div class="text-muted" style="color:#DC2626; margin-top:6px;">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="field mb-4">
+                            <label for="parent_id">Parent Policy (optional)</label>
+                            <select class="input" id="parent_id" name="parent_id">
                                 <option value="">None</option>
                                 @foreach ($parents as $parent)
-                                    <option value="{{ $parent->policy_id }}" {{ old('parent_id') == $parent->policy_id ? 'selected' : '' }}>{{ $parent->policy_name }}</option>
+                                    <option value="{{ $parent->policy_id }}" @selected(old('parent_id') == $parent->policy_id)>{{ $parent->policy_name }}</option>
                                 @endforeach
                             </select>
-                            <x-input-error :messages="$errors->get('parent_id')" class="mt-2" />
+                            @error('parent_id')
+                                <div class="text-muted" style="color:#DC2626; margin-top:6px;">{{ $message }}</div>
+                            @enderror
                         </div>
-                        <div class="mb-4">
-                            <x-input-label for="policy_name" :value="__('Policy Name')" />
-                            <x-text-input id="policy_name" class="block mt-1 w-full" type="text" name="policy_name" :value="old('policy_name')" required autofocus />
-                            <x-input-error :messages="$errors->get('policy_name')" class="mt-2" />
+                        <div class="field mb-4">
+                            <label for="policy_name">Policy Name</label>
+                            <input class="input" id="policy_name" type="text" name="policy_name" value="{{ old('policy_name') }}" required autofocus>
+                            @error('policy_name')
+                                <div class="text-muted" style="color:#DC2626; margin-top:6px;">{{ $message }}</div>
+                            @enderror
                         </div>
-                        <div class="mb-4">
-                            <x-input-label for="policy_name_np" :value="__('Nepali Name')" />
-                            <x-text-input id="policy_name_np" class="block mt-1 w-full" type="text" name="policy_name_np" :value="old('policy_name_np')" />
-                            <x-input-error :messages="$errors->get('policy_name_np')" class="mt-2" />
+                        <div class="field mb-4">
+                            <label for="policy_name_np">Nepali Name</label>
+                            <input class="input" id="policy_name_np" type="text" name="policy_name_np" value="{{ old('policy_name_np') }}">
+                            @error('policy_name_np')
+                                <div class="text-muted" style="color:#DC2626; margin-top:6px;">{{ $message }}</div>
+                            @enderror
                         </div>
-                        <div class="mb-4">
-                            <x-input-label for="status" :value="__('Status')" />
-                            <select id="status" name="status" class="mt-1 block w-full border-gray-300 focus:border-prabhu-red-500 focus:ring-prabhu-red-500 rounded-md shadow-sm" required>
-                                <option value="active" {{ old('status') === 'active' ? 'selected' : '' }}>Active</option>
-                                <option value="inactive" {{ old('status') === 'inactive' ? 'selected' : '' }}>Inactive</option>
+                        <div class="field mb-4">
+                            <label for="status">Status</label>
+                            <select class="input" id="status" name="status" required>
+                                <option value="active" @selected(old('status') === 'active')>Active</option>
+                                <option value="inactive" @selected(old('status') === 'inactive')>Inactive</option>
                             </select>
-                            <x-input-error :messages="$errors->get('status')" class="mt-2" />
+                            @error('status')
+                                <div class="text-muted" style="color:#DC2626; margin-top:6px;">{{ $message }}</div>
+                            @enderror
                         </div>
-                        <div class="flex items-center justify-end mt-6">
-                            <x-primary-button>{{ __('Save') }}</x-primary-button>
+                        <div class="flex gap-3 mt-4">
+                            <button type="submit" class="btn btn-primary">Save Policy Type</button>
+                            <a href="{{ route('master-data.index') }}" class="btn btn-outline">Cancel</a>
                         </div>
                     </form>
+                </div>
+            </div>
+        </div>
+
+        <div style="position: sticky; top: 24px; align-self: start;">
+            <div class="card">
+                <div class="card-head"><h2>Tips</h2></div>
+                <div class="card-body" style="font-size:13.5px; color: var(--ink-soft); line-height:1.7;">
+                    <ul style="list-style:disc outside; padding-left:22px; margin:0; display:grid; gap:6px; color:var(--brand);">
+                        <li><span style="color:var(--ink-soft);">Use a clear, descriptive policy name.</span></li>
+                        <li><span style="color:var(--ink-soft);">Set a parent to nest this under another type.</span></li>
+                        <li><span style="color:var(--ink-soft);">New policies default to active status.</span></li>
+                    </ul>
                 </div>
             </div>
         </div>

@@ -83,7 +83,11 @@ Route::middleware('auth')->group(function () {
         $policies = Policy::orderBy('policy_id')->get();
         $complainTypes = DB::table('complain_types')->orderBy('id')->get();
 
-        return view('master-data.index', compact('provinces', 'districts', 'policies', 'complainTypes'));
+        // For modal dropdowns
+        $allProvinces = Province::orderBy('province_name')->get(['province_id', 'province_name']);
+        $parentPolicies = Policy::whereNull('parent_id')->orderBy('policy_name')->get(['policy_id', 'policy_name']);
+
+        return view('master-data.index', compact('provinces', 'districts', 'policies', 'complainTypes', 'allProvinces', 'parentPolicies'));
     })->name('master-data.index');
 
     Route::resource('users', UserController::class)->except(['show', 'create', 'store']);

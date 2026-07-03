@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Policy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class PolicyController extends Controller
@@ -24,6 +25,7 @@ class PolicyController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
+            'policy_id' => ['required', 'integer', 'min:1', 'unique:policies,policy_id'],
             'parent_id' => ['nullable', 'exists:policies,policy_id'],
             'policy_name' => ['required', 'string', 'max:255'],
             'policy_name_np' => ['nullable', 'string', 'max:255'],
@@ -33,7 +35,7 @@ class PolicyController extends Controller
 
         Policy::create($validated);
 
-        return redirect()->route('policies.index')->with('toast', [
+        return redirect()->route('master-data.index')->with('toast', [
             'message' => 'Policy created successfully.',
             'type' => 'success',
         ]);
@@ -51,6 +53,7 @@ class PolicyController extends Controller
     public function update(Request $request, Policy $policy): RedirectResponse
     {
         $validated = $request->validate([
+            'policy_id' => ['required', 'integer', 'min:1', Rule::unique('policies', 'policy_id')->ignore($policy->policy_id, 'policy_id')],
             'parent_id' => ['nullable', 'exists:policies,policy_id'],
             'policy_name' => ['required', 'string', 'max:255'],
             'policy_name_np' => ['nullable', 'string', 'max:255'],
@@ -59,13 +62,23 @@ class PolicyController extends Controller
         ]);
 
         // Prevent circular reference
-        if ($validated['parent_id'] && $validated['parent_id'] == $policy->policy_id) {
-            return back()->withErrors(['parent_id' => 'A policy cannot be its own parent.']);
+        if ($validated['parent_id'] && $validated['parent_id'] == $validated['policy_id']) {
+            return back()->withErrors(['parent_id' => 'A policy cannot be its own parent.'])->withInput();
         }
 
-        $policy->update($validated);
+        // When the primary key changes, update it explicitly then save the rest.
+        if ((int) $validated['policy_id'] !== (int) $policy->policy_id) {
+            $policy->policy_id = $validated['policy_id'];
+        }
 
-        return redirect()->route('policies.index')->with('toast', [
+        $policy->parent_id = $validated['parent_id'];
+        $policy->policy_name = $validated['policy_name'];
+        $policy->policy_name_np = $validated['policy_name_np'];
+        $policy->code = $validated['code'] ?? null;
+        $policy->status = $validated['status'];
+        $policy->save();
+
+        return redirect()->route('master-data.index')->with('toast', [
             'message' => 'Policy updated successfully.',
             'type' => 'success',
         ]);
@@ -75,7 +88,7 @@ class PolicyController extends Controller
     {
         $policy->delete();
 
-        return redirect()->route('policies.index')->with('toast', [
+        return redirect()->route('master-data.index')->with('toast', [
             'message' => 'Policy deleted successfully.',
             'type' => 'success',
         ]);

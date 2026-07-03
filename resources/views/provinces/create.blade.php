@@ -1,31 +1,42 @@
 <x-app-layout>
-    <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                {{ __('Add Province') }}
-            </h2>
-            <a href="{{ route('provinces.index') }}" class="inline-flex items-center px-4 py-2 bg-gray-200 border border-transparent rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition ease-in-out duration-150">
-                Back to Provinces
-            </a>
-        </div>
-    </x-slot>
+    <x-slot name="title">Add Province</x-slot>
+    <x-slot name="crumbs">Master Data · Provinces · Add</x-slot>
 
-    <div class="py-12">
-        <div class="max-w-2xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="border-t-4 border-prabhu-red-600"></div>
-                <div class="p-6">
+    <div class="grid cols-3 mb-6">
+        <div style="grid-column: span 2;">
+            <div class="card">
+                <div class="card-head">
+                    <h2>Add Province</h2>
+                    <a href="{{ route('master-data.index') }}" class="btn btn-outline btn-sm">Back to Master Data</a>
+                </div>
+                <div class="card-body">
                     <form method="POST" action="{{ route('provinces.store') }}">
                         @csrf
-                        <div class="mb-4">
-                            <x-input-label for="province_name" :value="__('Province Name')" />
-                            <x-text-input id="province_name" class="block mt-1 w-full" type="text" name="province_name" :value="old('province_name')" required autofocus />
-                            <x-input-error :messages="$errors->get('province_name')" class="mt-2" />
+                        <div class="field mb-4">
+                            <label for="province_name">Province Name</label>
+                            <input class="input" id="province_name" type="text" name="province_name" value="{{ old('province_name') }}" required autofocus>
+                            @error('province_name')
+                                <div class="text-muted" style="color:#DC2626; margin-top:6px;">{{ $message }}</div>
+                            @enderror
                         </div>
-                        <div class="flex items-center justify-end mt-6">
-                            <x-primary-button>{{ __('Save') }}</x-primary-button>
+                        <div class="flex gap-3 mt-4">
+                            <button type="submit" class="btn btn-primary">Save Province</button>
+                            <a href="{{ route('master-data.index') }}" class="btn btn-outline">Cancel</a>
                         </div>
                     </form>
+                </div>
+            </div>
+        </div>
+
+        <div style="position: sticky; top: 24px; align-self: start;">
+            <div class="card">
+                <div class="card-head"><h2>Tips</h2></div>
+                <div class="card-body" style="font-size:13.5px; color: var(--ink-soft); line-height:1.7;">
+                    <ul style="list-style:disc outside; padding-left:22px; margin:0; display:grid; gap:6px; color:var(--brand);">
+                        <li><span style="color:var(--ink-soft);">Use the official province name as recorded in IRMS.</span></li>
+                        <li><span style="color:var(--ink-soft);">Provinces are referenced by districts and branches.</span></li>
+                        <li><span style="color:var(--ink-soft);">You can edit or delete a province later.</span></li>
+                    </ul>
                 </div>
             </div>
         </div>

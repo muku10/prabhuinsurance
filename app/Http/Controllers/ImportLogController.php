@@ -283,7 +283,9 @@ class ImportLogController extends Controller
                     throw new \RuntimeException('No valid data rows were found in the uploaded file.');
                 }
 
-                $modelClass::insert($rows);
+                foreach (array_chunk($rows, 1000) as $chunk) {
+                    $modelClass::insert($chunk);
+                }
 
                 $importLog->update(['status' => 'completed']);
             });

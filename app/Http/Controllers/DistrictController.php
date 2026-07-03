@@ -35,7 +35,7 @@ class DistrictController extends Controller
 
         District::create($validated);
 
-        return redirect()->route('districts.index')->with('toast', [
+        return redirect()->route('master-data.index')->with('toast', [
             'message' => 'District created successfully.',
             'type' => 'success',
         ]);
@@ -57,7 +57,7 @@ class DistrictController extends Controller
 
         $district->update($validated);
 
-        return redirect()->route('districts.index')->with('toast', [
+        return redirect()->route('master-data.index')->with('toast', [
             'message' => 'District updated successfully.',
             'type' => 'success',
         ]);
@@ -67,7 +67,7 @@ class DistrictController extends Controller
     {
         $district->delete();
 
-        return redirect()->route('districts.index')->with('toast', [
+        return redirect()->route('master-data.index')->with('toast', [
             'message' => 'District deleted successfully.',
             'type' => 'success',
         ]);
