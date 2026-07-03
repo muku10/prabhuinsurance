@@ -50,8 +50,8 @@ Route::get('/dashboard', function () {
             : 'Waiting for first upload',
         'totalRecords' => number_format($totalRecords),
         'totalRecordsDelta' => $totalRecords > 0
-            ? '+'.$totalRecords.' imported entries'
-            : 'No imported entries yet',
+            ? '+'.$totalRecords.' tracked entries'
+            : 'No tracked entries yet',
         'monthsProcessed' => ImportLog::select('fiscal_year', 'month')->distinct()->count(),
         'activeBranches' => Branch::count(),
         'provinceCount' => Province::count(),

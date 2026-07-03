@@ -11,6 +11,7 @@ class ImportLog extends Model
     protected $fillable = [
         'date',
         'user_id',
+        'upload_type',
         'file_name',
         'fiscal_year',
         'month',
@@ -31,7 +32,32 @@ class ImportLog extends Model
 
     public function transactions(): HasMany
     {
-        return $this->hasMany(Transaction::class);
+        return $this->hasMany(Premium::class);
+    }
+
+    public function premiums(): HasMany
+    {
+        return $this->hasMany(Premium::class);
+    }
+
+    public function intimationClaims(): HasMany
+    {
+        return $this->hasMany(IntimationClaim::class);
+    }
+
+    public function paidClaims(): HasMany
+    {
+        return $this->hasMany(PaidClaim::class);
+    }
+
+    public function withdrawalClaims(): HasMany
+    {
+        return $this->hasMany(WithdrawalClaim::class);
+    }
+
+    public function outstandingClaims(): HasMany
+    {
+        return $this->hasMany(OutstandingClaim::class);
     }
 
     public function branches(): HasMany

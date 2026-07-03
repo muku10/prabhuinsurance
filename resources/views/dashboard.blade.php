@@ -47,6 +47,7 @@
                     <table class="t">
                         <thead>
                             <tr>
+                                <th>Type</th>
                                 <th>File</th>
                                 <th>Fiscal Year</th>
                                 <th>Month</th>
@@ -58,6 +59,7 @@
                         <tbody>
                             @forelse ($recentUploads as $upload)
                                 <tr>
+                                    <td>{{ ucfirst(str_replace('_', ' ', $upload->upload_type ?? 'irms')) }}</td>
                                     <td>{{ basename($upload->file_name) }}</td>
                                     <td>{{ $upload->fiscal_year }}</td>
                                     <td>{{ $monthNames[$upload->month] ?? $upload->month }}</td>
@@ -71,7 +73,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-muted">No upload history available yet.</td>
+                                    <td colspan="7" class="text-muted">No upload history available yet.</td>
                                 </tr>
                             @endforelse
                         </tbody>

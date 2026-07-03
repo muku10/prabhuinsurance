@@ -46,12 +46,11 @@
                     <thead>
                         <tr>
                             <th>S.N</th>
+                            <th>Type</th>
                             <th>File Name</th>
                             <th>Fiscal Year</th>
                             <th>Month</th>
-                            <th>Txn</th>
-                            <th>Complains</th>
-                            <th>Branches</th>
+                            <th>Records</th>
                             <th>Imported By</th>
                             <th>Status</th>
                             <th style="text-align:right;">Action</th>
@@ -59,14 +58,23 @@
                     </thead>
                     <tbody>
                         @forelse ($importHistory as $history)
+                            @php
+                                $recordCount = match ($history->upload_type ?? 'irms') {
+                                    'intimation_claim' => $history->intimation_claims_count,
+                                    'paid_claim' => $history->paid_claims_count,
+                                    'withdrawal_claim' => $history->withdrawal_claims_count,
+                                    'outstanding_claim' => $history->outstanding_claims_count,
+                                    default => $history->premiums_count,
+                                };
+                                $typeLabel = ucfirst(str_replace('_', ' ', $history->upload_type ?? 'irms'));
+                            @endphp
                             <tr>
                                 <td>{{ $loop->iteration }}</td>
+                                <td>{{ $typeLabel }}</td>
                                 <td>{{ basename($history->file_name) }}</td>
                                 <td>{{ $history->fiscal_year }}</td>
                                 <td>{{ $monthNames[$history->month] ?? $history->month }}</td>
-                                <td>{{ $history->transactions_count }}</td>
-                                <td>{{ $history->complains_count }}</td>
-                                <td>{{ $history->branches_count }}</td>
+                                <td>{{ $recordCount }}</td>
                                 <td>{{ $history->user?->full_name ?? $history->user?->email ?? 'System' }}</td>
                                 <td><span class="badge success">Imported</span></td>
                                 <td style="text-align:right; white-space:nowrap;">
@@ -90,7 +98,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="10" class="text-muted" style="text-align:center; padding:24px;">No database import history found for the selected filters.</td>
+                                <td colspan="9" class="text-muted" style="text-align:center; padding:24px;">No database import history found for the selected filters.</td>
                             </tr>
                         @endforelse
                     </tbody>

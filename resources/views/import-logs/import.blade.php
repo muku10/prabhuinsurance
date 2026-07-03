@@ -27,10 +27,11 @@
                                         value="{{ $log->id }}"
                                         data-fiscal-year="{{ $log->fiscal_year }}"
                                         data-month="{{ $monthNames[$log->month] ?? $log->month }}"
+                                        data-type="{{ ucfirst(str_replace('_', ' ', $log->upload_type ?? 'irms')) }}"
                                         data-status="{{ ucfirst($log->status) }}"
                                         @selected((int) old('import_log_id', $selectedImportLog?->id) === $log->id)
                                     >
-                                        {{ basename($log->file_name) }} - FY {{ $log->fiscal_year }} - {{ $monthNames[$log->month] ?? $log->month }}
+                                        {{ ucfirst(str_replace('_', ' ', $log->upload_type ?? 'irms')) }} - {{ basename($log->file_name) }} - FY {{ $log->fiscal_year }} - {{ $monthNames[$log->month] ?? $log->month }}
                                     </option>
                                 @endforeach
                             </select>
@@ -49,12 +50,16 @@
                                 <div class="value" id="selectedMonth">{{ $selectedImportLog ? ($monthNames[$selectedImportLog->month] ?? $selectedImportLog->month) : '-' }}</div>
                             </div>
                             <div class="kpi">
+                                <div class="label">Type</div>
+                                <div class="value" id="selectedType">{{ $selectedImportLog ? ucfirst(str_replace('_', ' ', $selectedImportLog->upload_type ?? 'irms')) : '-' }}</div>
+                            </div>
+                            <div class="kpi">
                                 <div class="label">Status</div>
                                 <div class="value" id="selectedStatus">{{ $selectedImportLog ? ucfirst($selectedImportLog->status) : '-' }}</div>
                             </div>
                         </div>
 
-                        <div class="text-muted" style="font-size:13px; margin-top:14px;">Choose an uploaded file and the fiscal year and month will appear automatically from that upload log. Files already imported into the transactions table are hidden from this list.</div>
+                        <div class="text-muted" style="font-size:13px; margin-top:14px;">Choose any uploaded file and the fiscal year, month, and type will appear automatically from that upload log. Files already imported into the database are hidden from this list.</div>
 
                         <div class="flex gap-3 mt-4">
                             <button type="submit" class="btn btn-primary" id="submitImportBtn" @disabled(! $selectedImportLog)>
@@ -75,7 +80,7 @@
                 <div class="card-body" style="font-size:13.5px; color: var(--ink-soft); line-height:1.7;">
                     <ul style="list-style:disc outside; padding-left:22px; margin:0; display:grid; gap:6px; color:var(--brand);">
                         <li><span style="color:var(--ink-soft);">Select any uploaded file that is not yet imported.</span></li>
-                        <li><span style="color:var(--ink-soft);">Fiscal year and month are read from the selected upload.</span></li>
+                        <li><span style="color:var(--ink-soft);">Fiscal year, month, and type are read from the selected upload.</span></li>
                         <li><span style="color:var(--ink-soft);">Imported files move to the database history table below.</span></li>
                         <li><span style="color:var(--ink-soft);">If import fails, the log status changes to failed.</span></li>
                     </ul>
@@ -106,6 +111,7 @@
             const select = document.getElementById('import_log_id');
             const fiscalYear = document.getElementById('selectedFiscalYear');
             const month = document.getElementById('selectedMonth');
+            const type = document.getElementById('selectedType');
             const status = document.getElementById('selectedStatus');
             const submitButton = document.getElementById('submitImportBtn');
 
@@ -115,6 +121,7 @@
                 if (!selectedOption || !selectedOption.value) {
                     fiscalYear.textContent = '-';
                     month.textContent = '-';
+                    type.textContent = '-';
                     status.textContent = '-';
                     submitButton.disabled = true;
                     submitButton.textContent = 'Import to Database';
@@ -123,6 +130,7 @@
 
                 fiscalYear.textContent = selectedOption.dataset.fiscalYear || '-';
                 month.textContent = selectedOption.dataset.month || '-';
+                type.textContent = selectedOption.dataset.type || '-';
                 status.textContent = selectedOption.dataset.status || '-';
 
                 submitButton.disabled = false;

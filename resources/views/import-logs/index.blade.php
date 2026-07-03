@@ -45,6 +45,7 @@
                             <thead class="bg-gray-50">
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">S.N</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File Name</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fiscal Year</th>
@@ -59,6 +60,7 @@
                                 @forelse ($importLogs as $log)
                                     <tr class="hover:bg-gray-50">
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $loop->iteration }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ ucfirst(str_replace('_', ' ', $log->upload_type ?? 'irms')) }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $log->date->format('Y-m-d') }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><a href="{{ asset('storage/'.$log->file_name) }}" target="_blank" class="text-prabhu-red-600 hover:text-prabhu-red-900">{{ basename($log->file_name) }}</a></td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $log->fiscal_year }}</td>
@@ -97,7 +99,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="9" class="px-6 py-12 text-center text-gray-500">No import logs found.</td>
+                                        <td colspan="10" class="px-6 py-12 text-center text-gray-500">No import logs found.</td>
                                     </tr>
                                 @endforelse
                             </tbody>

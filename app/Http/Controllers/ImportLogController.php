@@ -6,13 +6,19 @@ use App\Models\Branch;
 use App\Models\Complain;
 use App\Models\District;
 use App\Models\ImportLog;
+use App\Models\IntimationClaim;
+use App\Models\OutstandingClaim;
+use App\Models\PaidClaim;
+use App\Models\Premium;
 use App\Models\Policy;
 use App\Models\Province;
 use App\Models\Transaction;
+use App\Models\WithdrawalClaim;
 use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -23,6 +29,15 @@ class ImportLogController extends Controller
     private const SHEET_TRANSACTIONS = 0;
     private const SHEET_COMPLAINS = 1;
     private const SHEET_BRANCH_NETWORK = 2;
+    private const IMPORTABLE_UPLOAD_TYPES = ['irms'];
+
+    private const UPLOAD_FIELD_MAP = [
+        'irms' => 'irms_file',
+        'outstanding_claim' => 'outstanding_claim_file',
+        'paid_claim' => 'paid_claim_file',
+        'withdrawal_claim' => 'withdrawal_claim_file',
+        'intimation_claim' => 'intimation_claim_file',
+    ];
 
     public function index(Request $request): View
     {
@@ -48,8 +63,8 @@ class ImportLogController extends Controller
         $selectedFiscalYear = $request->string('fiscal_year')->toString();
         $selectedMonth = $request->integer('month') ?: null;
 
-        $importHistory = ImportLog::with(['user', 'transactions', 'complains', 'branches'])
-            ->withCount(['transactions', 'complains', 'branches'])
+        $importHistory = ImportLog::with(['user', 'premiums', 'intimationClaims', 'paidClaims', 'withdrawalClaims', 'outstandingClaims'])
+            ->withCount(['premiums', 'intimationClaims', 'paidClaims', 'withdrawalClaims', 'outstandingClaims'])
             ->where('status', 'completed')
             ->when($selectedFiscalYear !== '', fn ($query) => $query->where('fiscal_year', $selectedFiscalYear))
             ->when($selectedMonth, fn ($query) => $query->where('month', $selectedMonth))
@@ -62,13 +77,14 @@ class ImportLogController extends Controller
 
     public function create(): View
     {
-        $recentUploads = ImportLog::latest('date')->latest('id')->limit(3)->get();
+        $recentUploads = ImportLog::latest('date')->latest('id')->limit(8)->get();
         $today = now();
         $currentPeriod = $this->currentBsPeriod($today);
         $monthNames = $this->bsMonthNames();
         $submissionDateBs = $this->currentBsDate($today, $monthNames);
         $fiscalYearOptions = $this->fiscalYearOptions($currentPeriod['fiscal_year']);
-        $selectedImportLog = ImportLog::find(session('selected_import_log_id'));
+        $selectedImportLogId = session('selected_import_log_id');
+        $selectedImportLog = $selectedImportLogId ? ImportLog::find($selectedImportLogId) : $recentUploads->first();
 
         return view('import-logs.create', compact(
             'recentUploads',
@@ -87,7 +103,12 @@ class ImportLogController extends Controller
             ->latest('date')
             ->latest('id')
             ->get();
-        $selectedImportLog = $availableImportLogs->firstWhere('id', session('selected_import_log_id')) ?? $availableImportLogs->first();
+
+        $selectedImportLogId = request()->integer('import_log_id') ?: session('selected_import_log_id');
+        $selectedImportLog = $selectedImportLogId
+            ? $availableImportLogs->firstWhere('id', $selectedImportLogId)
+            : $availableImportLogs->first();
+
         return view('import-logs.import', compact('availableImportLogs', 'monthNames', 'selectedImportLog'));
     }
 
@@ -95,35 +116,56 @@ class ImportLogController extends Controller
     {
         $today = now();
 
-        $validated = $request->validate([
+        $request->validate([
             'fiscal_year' => ['required', 'string', 'max:255'],
             'month' => ['required', 'integer', 'min:1', 'max:12'],
-            'file' => ['required', 'file', 'mimes:xlsx,xls,csv', 'max:20480'],
+            'irms_file' => ['nullable', 'file', 'mimes:xlsx,xls,csv', 'max:20480'],
+            'outstanding_claim_file' => ['nullable', 'file', 'mimes:xlsx,xls,csv,pdf', 'max:20480'],
+            'paid_claim_file' => ['nullable', 'file', 'mimes:xlsx,xls,csv,pdf', 'max:20480'],
+            'withdrawal_claim_file' => ['nullable', 'file', 'mimes:xlsx,xls,csv,pdf', 'max:20480'],
+            'intimation_claim_file' => ['nullable', 'file', 'mimes:xlsx,xls,csv,pdf', 'max:20480'],
         ]);
 
-        $file = $request->file('file');
-        $extension = $file->getClientOriginalExtension();
-        $baseName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-        $safeName = preg_replace('/[^A-Za-z0-9_-]/', '-', $baseName);
-        $fileName = now()->format('YmdHis').'-'.$safeName.'.'.$extension;
-        $fiscalYearFolder = str_replace(['/', '\\'], '-', $validated['fiscal_year']);
-        $monthFolder = str_pad((string) $validated['month'], 2, '0', STR_PAD_LEFT);
-        $storagePath = 'uploads/'.$fiscalYearFolder.'/'.$monthFolder;
-        $storedFile = $file->storeAs($storagePath, $fileName, 'public');
+        $createdImportLogs = [];
+        $fiscalYearFolder = str_replace(['/', '\\'], '-', $request->string('fiscal_year')->toString());
+        $monthFolder = str_pad((string) $request->integer('month'), 2, '0', STR_PAD_LEFT);
 
-        $importLog = ImportLog::create([
-            'date' => $today->toDateString(),
-            'user_id' => auth()->id(),
-            'file_name' => $storedFile,
-            'fiscal_year' => $validated['fiscal_year'],
-            'month' => $validated['month'],
-            'status' => 'pending',
-        ]);
+        foreach (self::UPLOAD_FIELD_MAP as $uploadType => $fieldName) {
+            if (! $request->hasFile($fieldName)) {
+                continue;
+            }
+
+            $file = $request->file($fieldName);
+            $extension = $file->getClientOriginalExtension();
+            $baseName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+            $safeName = preg_replace('/[^A-Za-z0-9_-]/', '-', $baseName);
+            $fileName = now()->format('YmdHis').'-'.$uploadType.'-'.$safeName.'.'.$extension;
+            $storagePath = 'uploads/'.$uploadType.'/'.$fiscalYearFolder.'/'.$monthFolder;
+            $storedFile = $file->storeAs($storagePath, $fileName, 'public');
+
+            $createdImportLogs[] = ImportLog::create([
+                'date' => $today->toDateString(),
+                'user_id' => auth()->id(),
+                'upload_type' => $uploadType,
+                'file_name' => $storedFile,
+                'fiscal_year' => $request->string('fiscal_year')->toString(),
+                'month' => $request->integer('month'),
+                'status' => 'pending',
+            ]);
+        }
+
+        if ($createdImportLogs === []) {
+            return back()->withErrors([
+                'upload_files' => 'Choose at least one file to upload.',
+            ])->withInput();
+        }
+
+        $selectedImportLog = collect($createdImportLogs)->firstWhere('upload_type', 'irms') ?? $createdImportLogs[0];
 
         return redirect()->route('upload.create')
-            ->with('selected_import_log_id', $importLog->id)
+            ->with('selected_import_log_id', $selectedImportLog->id)
             ->with('toast', [
-                'message' => 'File uploaded successfully. Continue with Step 3 to import it into the database.',
+                'message' => count($createdImportLogs).' file(s) uploaded successfully. Use the IRMS file for database import.',
                 'type' => 'success',
             ]);
     }
@@ -139,7 +181,7 @@ class ImportLogController extends Controller
             'import_log_id' => ['required', 'integer', 'exists:import_logs,id'],
         ]);
 
-        $importLog = ImportLog::findOrFail($validated['import_log_id']);
+        $importLog = $this->importableImportLogQuery()->findOrFail($validated['import_log_id']);
 
         return $this->performImport($importLog, 'upload.import-module');
     }
@@ -156,7 +198,8 @@ class ImportLogController extends Controller
             'fiscal_year' => ['required', 'string', 'max:255'],
             'month' => ['required', 'integer', 'min:1', 'max:12'],
             'status' => ['required', 'in:pending,processing,completed,failed'],
-            'file' => ['nullable', 'file', 'mimes:xlsx,xls,csv', 'max:20480'],
+            'upload_type' => ['nullable', 'string', 'max:255'],
+            'file' => ['nullable', 'file', 'mimes:xlsx,xls,csv,pdf', 'max:20480'],
         ]);
 
         unset($validated['file']);
@@ -169,7 +212,7 @@ class ImportLogController extends Controller
             $fileName = now()->format('YmdHis').'-'.$safeName.'.'.$extension;
             $fiscalYearFolder = str_replace(['/', '\\'], '-', $validated['fiscal_year']);
             $monthFolder = str_pad((string) $validated['month'], 2, '0', STR_PAD_LEFT);
-            $storagePath = 'uploads/'.$fiscalYearFolder.'/'.$monthFolder;
+            $storagePath = 'uploads/'.($validated['upload_type'] ?? 'legacy').'/'.$fiscalYearFolder.'/'.$monthFolder;
 
             $validated['file_name'] = $file->storeAs($storagePath, $fileName, 'public');
 
@@ -202,22 +245,12 @@ class ImportLogController extends Controller
 
     public function destroyImportedData(ImportLog $importLog): RedirectResponse
     {
-        $deletedTransactions = 0;
-        $deletedComplains = 0;
-        $deletedBranches = 0;
-
-        DB::transaction(function () use ($importLog, &$deletedTransactions, &$deletedComplains, &$deletedBranches) {
-            $deletedTransactions = Transaction::where('import_log_id', $importLog->id)->delete();
-            $deletedComplains = Complain::where('import_log_id', $importLog->id)->delete();
-            $deletedBranches = Branch::where('import_log_id', $importLog->id)->delete();
-            $importLog->update(['status' => 'pending']);
-        });
-
-        $totalDeleted = $deletedTransactions + $deletedComplains + $deletedBranches;
+        $totalDeleted = $this->deleteImportedRows($importLog);
+        $importLog->update(['status' => 'pending']);
 
         return redirect()->route('upload.import-module')->with('toast', [
             'message' => $totalDeleted > 0
-                ? "Imported data deleted: {$deletedTransactions} transactions, {$deletedComplains} complains, {$deletedBranches} branch network records. The uploaded file is still available for re-import."
+                ? 'Imported data deleted. The uploaded file is still available for re-import.'
                 : 'No imported database rows were found for this file.',
             'type' => $totalDeleted > 0 ? 'success' : 'warning',
         ]);
@@ -240,48 +273,17 @@ class ImportLogController extends Controller
 
                 $filePath = Storage::disk('public')->path($importLog->file_name);
                 $spreadsheet = IOFactory::load($filePath);
-                $sheetCount = $spreadsheet->getSheetCount();
 
-                $importBatchToken = (string) Str::uuid();
-                $totalImported = 0;
+                $uploadType = $this->normalizeUploadType($importLog->upload_type);
+                [$modelClass, $rows] = $this->buildRowsForUploadType($spreadsheet, $importLog, $uploadType);
 
-                // Sheet 0: Transactions
-                Transaction::where('import_log_id', $importLog->id)->delete();
-                $spreadsheet->setActiveSheetIndex(self::SHEET_TRANSACTIONS);
-                $transactions = $this->buildTransactionsFromUpload($spreadsheet, $importLog, $importLog->fiscal_year, (int) $importLog->month, $importBatchToken);
+                $modelClass::where('import_log_id', $importLog->id)->delete();
 
-                if (! empty($transactions)) {
-                    Transaction::insert($transactions);
-                    $totalImported += count($transactions);
+                if (empty($rows)) {
+                    throw new \RuntimeException('No valid data rows were found in the uploaded file.');
                 }
 
-                // Sheet 1: Complains (if present)
-                if ($sheetCount > self::SHEET_COMPLAINS) {
-                    Complain::where('import_log_id', $importLog->id)->delete();
-                    $spreadsheet->setActiveSheetIndex(self::SHEET_COMPLAINS);
-                    $complains = $this->buildComplainsFromUpload($spreadsheet, $importLog, $importLog->fiscal_year, (int) $importLog->month);
-
-                    if (! empty($complains)) {
-                        Complain::insert($complains);
-                        $totalImported += count($complains);
-                    }
-                }
-
-                // Sheet 2: Branch Network (if present)
-                if ($sheetCount > self::SHEET_BRANCH_NETWORK) {
-                    Branch::where('import_log_id', $importLog->id)->delete();
-                    $spreadsheet->setActiveSheetIndex(self::SHEET_BRANCH_NETWORK);
-                    $branches = $this->buildBranchesFromUpload($spreadsheet, $importLog);
-
-                    if (! empty($branches)) {
-                        Branch::insert($branches);
-                        $totalImported += count($branches);
-                    }
-                }
-
-                if ($totalImported === 0) {
-                    throw new \RuntimeException('No valid data rows were found in any sheet of the uploaded file.');
-                }
+                $modelClass::insert($rows);
 
                 $importLog->update(['status' => 'completed']);
             });
@@ -301,6 +303,362 @@ class ImportLogController extends Controller
                 'message' => 'Data imported into the database successfully.',
                 'type' => 'success',
             ]);
+    }
+
+    private function uploadTypes(): array
+    {
+        return self::UPLOAD_FIELD_MAP;
+    }
+
+    private function importableImportLogQuery()
+    {
+        return ImportLog::query();
+    }
+
+    private function buildPremiumRowsFromUpload($spreadsheet, ImportLog $importLog): array
+    {
+        $worksheet = $spreadsheet->getActiveSheet();
+        $rows = $worksheet->toArray(null, true, true, false);
+
+        if (count($rows) < 2) {
+            return [];
+        }
+
+        $headerIndex = $this->findHeaderRowIndex($rows, [
+            'stateid',
+            'districtid',
+            'month',
+            'department',
+            'class',
+            'freshpolicy',
+            'renewalpolicy',
+            'endrosementpolicy',
+            'grosspremiumincome',
+            'suminsured',
+            'remarks',
+        ]);
+
+        if ($headerIndex === null) {
+            throw new \RuntimeException('The uploaded premium file is missing required headers.');
+        }
+
+        $headers = array_map(fn ($value) => $this->normalizeHeader((string) $value), $rows[$headerIndex]);
+        $records = [];
+        $timestamp = now();
+        $validProvinceIds = Province::query()->pluck('province_id')->flip();
+        $validDistrictIds = District::query()->pluck('district_id')->flip();
+
+        foreach (array_slice($rows, $headerIndex + 1) as $row) {
+            $mappedRow = $this->mapHeaderRow($headers, $row);
+
+            if (! $this->hasAnyValue($mappedRow, ['stateid', 'districtid', 'department', 'class', 'freshpolicy', 'renewalpolicy', 'endrosementpolicy', 'grosspremiumincome', 'suminsured', 'remarks'])) {
+                continue;
+            }
+
+            $records[] = [
+                'import_log_id' => $importLog->id,
+                'state_id' => $this->sanitizeForeignKey($mappedRow['stateid'] ?? null, $validProvinceIds),
+                'district_id' => $this->sanitizeForeignKey($mappedRow['districtid'] ?? null, $validDistrictIds),
+                'fiscal_year' => $importLog->fiscal_year,
+                'month' => $this->nullableInteger($mappedRow['month'] ?? null) ?? (int) $importLog->month,
+                'department' => $this->nullableString($mappedRow['department'] ?? null),
+                'class' => $this->nullableString($mappedRow['class'] ?? null),
+                'fresh_policy' => $this->numericInteger($mappedRow['freshpolicy'] ?? null),
+                'renewal_policy' => $this->numericInteger($mappedRow['renewalpolicy'] ?? null),
+                'endrosement_policy' => $this->numericInteger($mappedRow['endrosementpolicy'] ?? null),
+                'gross_premium_income' => $this->numericDecimal($mappedRow['grosspremiumincome'] ?? null),
+                'sum_insured' => $this->numericDecimal($mappedRow['suminsured'] ?? null),
+                'remarks' => $this->nullableString($mappedRow['remarks'] ?? null),
+                'created_at' => $timestamp,
+                'updated_at' => $timestamp,
+            ];
+        }
+
+        return $records;
+    }
+
+    private function buildIntimationClaimRowsFromUpload($spreadsheet, ImportLog $importLog): array
+    {
+        $worksheet = $spreadsheet->getActiveSheet();
+        $rows = $worksheet->toArray(null, true, true, false);
+
+        if (count($rows) < 2) {
+            return [];
+        }
+
+        $headerIndex = $this->findHeaderRowIndex($rows, [
+            'province',
+            'district',
+            'branch',
+            'department',
+            'month',
+            'class',
+            'estimatedloss',
+            'status',
+        ]);
+
+        if ($headerIndex === null) {
+            throw new \RuntimeException('The uploaded intimation file is missing required headers.');
+        }
+
+        $headers = array_map(fn ($value) => $this->normalizeHeader((string) $value), $rows[$headerIndex]);
+        $records = [];
+        $timestamp = now();
+
+        foreach (array_slice($rows, $headerIndex + 1) as $row) {
+            $mappedRow = $this->mapHeaderRow($headers, $row);
+
+            if (! $this->hasAnyValue($mappedRow, ['province', 'district', 'branch', 'department', 'class', 'estimatedloss', 'status'])) {
+                continue;
+            }
+
+            $records[] = [
+                'import_log_id' => $importLog->id,
+                'fiscal_year' => $importLog->fiscal_year,
+                'month' => $this->nullableInteger($mappedRow['month'] ?? null) ?? (int) $importLog->month,
+                'province' => $this->nullableString($mappedRow['province'] ?? null),
+                'district' => $this->nullableString($mappedRow['district'] ?? null),
+                'branch' => $this->nullableString($mappedRow['branch'] ?? null),
+                'department' => $this->nullableString($mappedRow['department'] ?? null),
+                'class' => $this->nullableString($mappedRow['class'] ?? null),
+                'estimated_loss' => $this->nullableDecimal($mappedRow['estimatedloss'] ?? null) ?? 0,
+                'status' => $this->nullableString($mappedRow['status'] ?? null),
+                'created_at' => $timestamp,
+                'updated_at' => $timestamp,
+            ];
+        }
+
+        return $records;
+    }
+
+    private function buildPaidClaimRowsFromUpload($spreadsheet, ImportLog $importLog): array
+    {
+        $worksheet = $spreadsheet->getActiveSheet();
+        $rows = $worksheet->toArray(null, true, true, false);
+
+        if (count($rows) < 2) {
+            return [];
+        }
+
+        $headerIndex = $this->findHeaderRowIndex($rows, [
+            'month',
+            'department',
+            'class',
+            'province',
+            'district',
+            'branchname',
+            'totalpaidamount',
+            'turnarounddays',
+        ]);
+
+        if ($headerIndex === null) {
+            throw new \RuntimeException('The uploaded paid claim file is missing required headers.');
+        }
+
+        $headers = array_map(fn ($value) => $this->normalizeHeader((string) $value), $rows[$headerIndex]);
+        $records = [];
+        $timestamp = now();
+
+        foreach (array_slice($rows, $headerIndex + 1) as $row) {
+            $mappedRow = $this->mapHeaderRow($headers, $row);
+
+            if (! $this->hasAnyValue($mappedRow, ['month', 'department', 'class', 'province', 'district', 'branchname', 'totalpaidamount', 'turnarounddays'])) {
+                continue;
+            }
+
+            $records[] = [
+                'import_log_id' => $importLog->id,
+                'fiscal_year' => $importLog->fiscal_year,
+                'month' => $this->nullableInteger($mappedRow['month'] ?? null) ?? (int) $importLog->month,
+                'department' => $this->nullableString($mappedRow['department'] ?? null),
+                'class' => $this->nullableString($mappedRow['class'] ?? null),
+                'province' => $this->nullableString($mappedRow['province'] ?? null),
+                'district' => $this->nullableString($mappedRow['district'] ?? null),
+                'branch_name' => $this->nullableString($mappedRow['branchname'] ?? null),
+                'total_paid_amount' => $this->nullableDecimal($mappedRow['totalpaidamount'] ?? null) ?? 0,
+                'turnaround_days' => $this->nullableInteger($mappedRow['turnarounddays'] ?? null) ?? 0,
+                'created_at' => $timestamp,
+                'updated_at' => $timestamp,
+            ];
+        }
+
+        return $records;
+    }
+
+    private function buildWithdrawalClaimRowsFromUpload($spreadsheet, ImportLog $importLog): array
+    {
+        $worksheet = $spreadsheet->getActiveSheet();
+        $rows = $worksheet->toArray(null, true, true, false);
+
+        if (count($rows) < 2) {
+            return [];
+        }
+
+        $headerIndex = $this->findHeaderRowIndex($rows, [
+            'month',
+            'province',
+            'district',
+            'branch',
+            'department',
+            'class',
+        ]);
+
+        if ($headerIndex === null) {
+            throw new \RuntimeException('The uploaded withdrawal claim file is missing required headers.');
+        }
+
+        $headers = array_map(fn ($value) => $this->normalizeHeader((string) $value), $rows[$headerIndex]);
+        $records = [];
+        $timestamp = now();
+
+        foreach (array_slice($rows, $headerIndex + 1) as $row) {
+            $mappedRow = $this->mapHeaderRow($headers, $row);
+
+            if (! $this->hasAnyValue($mappedRow, ['month', 'province', 'district', 'branch', 'department', 'class'])) {
+                continue;
+            }
+
+            $records[] = [
+                'import_log_id' => $importLog->id,
+                'fiscal_year' => $importLog->fiscal_year,
+                'month' => $this->nullableInteger($mappedRow['month'] ?? null) ?? (int) $importLog->month,
+                'province' => $this->nullableString($mappedRow['province'] ?? null),
+                'district' => $this->nullableString($mappedRow['district'] ?? null),
+                'branch' => $this->nullableString($mappedRow['branch'] ?? null),
+                'department' => $this->nullableString($mappedRow['department'] ?? null),
+                'class' => $this->nullableString($mappedRow['class'] ?? null),
+                'created_at' => $timestamp,
+                'updated_at' => $timestamp,
+            ];
+        }
+
+        return $records;
+    }
+
+    private function buildOutstandingClaimRowsFromUpload($spreadsheet, ImportLog $importLog): array
+    {
+        $worksheet = $spreadsheet->getActiveSheet();
+        $rows = $worksheet->toArray(null, true, true, false);
+
+        if (count($rows) < 2) {
+            return [];
+        }
+
+        $headerIndex = $this->findHeaderRowIndex($rows, [
+            'province',
+            'district',
+            'branch',
+            'department',
+            'class',
+            'amount',
+            'developmentyear',
+        ]);
+
+        if ($headerIndex === null) {
+            throw new \RuntimeException('The uploaded outstanding claim file is missing required headers.');
+        }
+
+        $headers = array_map(fn ($value) => $this->normalizeHeader((string) $value), $rows[$headerIndex]);
+        $records = [];
+        $timestamp = now();
+
+        foreach (array_slice($rows, $headerIndex + 1) as $row) {
+            $mappedRow = $this->mapHeaderRow($headers, $row);
+
+            if (! $this->hasAnyValue($mappedRow, ['province', 'district', 'branch', 'department', 'class', 'amount', 'developmentyear'])) {
+                continue;
+            }
+
+            $records[] = [
+                'import_log_id' => $importLog->id,
+                'fiscal_year' => $importLog->fiscal_year,
+                'development_year' => $this->nullableString($mappedRow['developmentyear'] ?? null),
+                'province' => $this->nullableString($mappedRow['province'] ?? null),
+                'district' => $this->nullableString($mappedRow['district'] ?? null),
+                'branch' => $this->nullableString($mappedRow['branch'] ?? null),
+                'department' => $this->nullableString($mappedRow['department'] ?? null),
+                'class' => $this->nullableString($mappedRow['class'] ?? null),
+                'amount' => $this->nullableDecimal($mappedRow['amount'] ?? null) ?? 0,
+                'created_at' => $timestamp,
+                'updated_at' => $timestamp,
+            ];
+        }
+
+        return $records;
+    }
+
+    private function findHeaderRowIndex(array $rows, array $requiredHeaders): ?int
+    {
+        foreach ($rows as $index => $row) {
+            $normalizedRow = array_map(fn ($value) => $this->normalizeHeader((string) $value), $row);
+
+            if (empty(array_diff($requiredHeaders, $normalizedRow))) {
+                return $index;
+            }
+        }
+
+        return null;
+    }
+
+    private function mapHeaderRow(array $headers, array $row): array
+    {
+        $mappedRow = [];
+
+        foreach ($headers as $index => $header) {
+            if ($header === '') {
+                continue;
+            }
+
+            $mappedRow[$header] = $row[$index] ?? null;
+        }
+
+        return $mappedRow;
+    }
+
+    private function hasAnyValue(array $mappedRow, array $keys): bool
+    {
+        foreach ($keys as $key) {
+            if ($this->nullableString($mappedRow[$key] ?? null) !== null) {
+                return true;
+            }
+
+            if ($this->nullableInteger($mappedRow[$key] ?? null) !== null) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function deleteImportedRows(ImportLog $importLog): int
+    {
+        return match ($this->normalizeUploadType($importLog->upload_type)) {
+            'premium' => Premium::where('import_log_id', $importLog->id)->delete(),
+            'intimation_claim' => IntimationClaim::where('import_log_id', $importLog->id)->delete(),
+            'paid_claim' => PaidClaim::where('import_log_id', $importLog->id)->delete(),
+            'withdrawal_claim' => WithdrawalClaim::where('import_log_id', $importLog->id)->delete(),
+            'outstanding_claim' => OutstandingClaim::where('import_log_id', $importLog->id)->delete(),
+            default => 0,
+        };
+    }
+
+    private function normalizeUploadType(?string $uploadType): string
+    {
+        $normalized = $uploadType ? strtolower(trim($uploadType)) : 'premium';
+
+        return $normalized === 'irms' ? 'premium' : $normalized;
+    }
+
+    private function buildRowsForUploadType($spreadsheet, ImportLog $importLog, string $uploadType): array
+    {
+        return match ($uploadType) {
+            'premium' => [Premium::class, $this->buildPremiumRowsFromUpload($spreadsheet, $importLog)],
+            'intimation_claim' => [IntimationClaim::class, $this->buildIntimationClaimRowsFromUpload($spreadsheet, $importLog)],
+            'paid_claim' => [PaidClaim::class, $this->buildPaidClaimRowsFromUpload($spreadsheet, $importLog)],
+            'withdrawal_claim' => [WithdrawalClaim::class, $this->buildWithdrawalClaimRowsFromUpload($spreadsheet, $importLog)],
+            'outstanding_claim' => [OutstandingClaim::class, $this->buildOutstandingClaimRowsFromUpload($spreadsheet, $importLog)],
+            default => throw new \RuntimeException('Unsupported upload type: '.$uploadType),
+        };
     }
 
     private function buildTransactionsFromUpload($spreadsheet, ImportLog $importLog, string $fiscalYear, int $selectedMonth, string $importBatchToken): array
