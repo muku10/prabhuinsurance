@@ -71,6 +71,8 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/upload', [ImportLogController::class, 'create'])->name('upload.create');
     Route::post('/upload', [ImportLogController::class, 'store'])->name('upload.store');
+    Route::get('/upload/{type}', [ImportLogController::class, 'createForType'])->name('upload.type');
+    Route::post('/upload/{type}', [ImportLogController::class, 'storeForType'])->name('upload.type.store');
     Route::get('/import-data', [ImportLogController::class, 'importModule'])->name('upload.import-module');
     Route::post('/import-data', [ImportLogController::class, 'importFromModule'])->name('upload.import-module.store');
     Route::delete('/import-data/{importLog}', [ImportLogController::class, 'destroyImportedData'])->name('upload.import-module.destroy');

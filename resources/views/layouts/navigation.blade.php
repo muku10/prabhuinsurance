@@ -9,9 +9,28 @@
         <a href="{{ route('dashboard') }}" class="{{ request()->routeIs('dashboard') ? 'active' : '' }}">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Dashboard
         </a>
-        <a href="{{ route('upload.create') }}" class="{{ request()->routeIs('upload.create') ? 'active' : '' }}">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Upload Data
-        </a>
+        @php
+            $uploadTypes = [
+                'irms' => 'IRMS',
+                'outstanding_claim' => 'Outstanding Claim',
+                'paid_claim' => 'Paid Claim',
+                'withdrawal_claim' => 'Withdrawal Claim',
+                'intimation_claim' => 'Intimation Claim',
+            ];
+            $currentType = request()->route('type');
+            $isUploadTypeRoute = request()->routeIs('upload.type') || request()->routeIs('upload.type.store');
+        @endphp
+        <div class="nav-group {{ $isUploadTypeRoute ? 'open' : '' }}" data-nav-group>
+            <button type="button" class="nav-toggle {{ $isUploadTypeRoute || request()->routeIs('upload.create') ? 'active' : '' }}" data-nav-toggle>
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Upload Data
+                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+            <div class="nav-sub">
+                @foreach ($uploadTypes as $typeKey => $typeLabel)
+                    <a href="{{ route('upload.type', $typeKey) }}" class="{{ $isUploadTypeRoute && $currentType === $typeKey ? 'active' : '' }}">{{ $typeLabel }}</a>
+                @endforeach
+            </div>
+        </div>
         <a href="{{ route('upload.import-module') }}" class="{{ request()->routeIs('upload.import-module') || request()->routeIs('upload.import-module.store') ? 'active' : '' }}">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>Import Data
         </a>
@@ -41,4 +60,11 @@
             </button>
         </form>
     </nav>
+    <script>
+        document.querySelectorAll('[data-nav-toggle]').forEach(toggle => {
+            toggle.addEventListener('click', () => {
+                toggle.closest('[data-nav-group]').classList.toggle('open');
+            });
+        });
+    </script>
 </aside>

@@ -85,11 +85,11 @@
         <div class="card">
             <div class="card-head"><h2>Quick Actions</h2></div>
             <div class="card-body" style="display:flex; flex-direction:column; gap:10px;">
-                <a class="btn btn-primary" href="{{ route('upload.create') }}">Upload New File</a>
+                <a class="btn btn-primary" href="{{ route('upload.type', 'irms') }}">Upload New File</a>
                 <a class="btn btn-outline" href="{{ route('import-logs.index') }}">Upload History</a>
                 <a class="btn btn-outline" href="{{ route('master-data.index') }}">Manage Master Data</a>
                 <a class="btn btn-outline" href="{{ route('dashboard') }}">Public Dashboard</a>
-                <a class="btn btn-outline" href="{{ route('upload.create') }}">Download Template</a>
+                <a class="btn btn-outline" href="{{ route('upload.type', 'irms') }}">Download Template</a>
                 <div style="border-top:1px solid var(--line); margin:6px 0; padding-top:10px;">
                     <div class="text-muted" style="font-size:13px;">Logged in as</div>
                     <strong>{{ trim(($user->first_name ?? '').' '.($user->last_name ?? '')) }}</strong>

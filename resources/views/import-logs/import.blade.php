@@ -7,7 +7,7 @@
             <div class="card">
                 <div class="card-head">
                     <h2>Select uploaded file</h2>
-                    <a href="{{ route('upload.create') }}" class="btn btn-outline">Back to Upload</a>
+                    <a href="{{ $selectedImportLog && $selectedImportLog->upload_type ? route('upload.type', $selectedImportLog->upload_type) : route('upload.type', 'irms') }}" class="btn btn-outline">Back to Upload</a>
                 </div>
                 <div class="card-body">
                     @if ($errors->has('import_log_id') || $errors->has('file'))
@@ -65,7 +65,7 @@
                             <button type="submit" class="btn btn-primary" id="submitImportBtn" @disabled(! $selectedImportLog)>
                                 Import to Database
                             </button>
-                            <a href="{{ route('upload.create') }}" class="btn btn-outline">Upload Another File</a>
+                            <a href="{{ $selectedImportLog && $selectedImportLog->upload_type ? route('upload.type', $selectedImportLog->upload_type) : route('upload.type', 'irms') }}" class="btn btn-outline">Upload Another File</a>
                             <a href="{{ route('import-logs.index') }}" class="btn btn-ghost" style="border:1px solid var(--line);">View Upload History</a>
                             <a href="{{ route('upload.database-history') }}" class="btn btn-ghost" style="border:1px solid var(--line);">View Import History</a>
                         </div>

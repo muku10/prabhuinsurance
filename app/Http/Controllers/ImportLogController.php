@@ -39,6 +39,39 @@ class ImportLogController extends Controller
         'intimation_claim' => 'intimation_claim_file',
     ];
 
+    private const UPLOAD_TYPE_META = [
+        'irms' => [
+            'title' => 'IRMS',
+            'description' => 'Upload the core IRMS workbook for the selected period.',
+            'extensions' => 'xlsx,xls,csv',
+            'accept' => '.xlsx,.xls,.csv',
+        ],
+        'outstanding_claim' => [
+            'title' => 'Outstanding Claim',
+            'description' => 'Attach the outstanding claim file for the selected period.',
+            'extensions' => 'xlsx,xls,csv,pdf',
+            'accept' => '.xlsx,.xls,.csv,.pdf',
+        ],
+        'paid_claim' => [
+            'title' => 'Paid Claim',
+            'description' => 'Attach the paid claim file for the selected period.',
+            'extensions' => 'xlsx,xls,csv,pdf',
+            'accept' => '.xlsx,.xls,.csv,.pdf',
+        ],
+        'withdrawal_claim' => [
+            'title' => 'Withdrawal Claim',
+            'description' => 'Attach the withdrawal claim file for the selected period.',
+            'extensions' => 'xlsx,xls,csv,pdf',
+            'accept' => '.xlsx,.xls,.csv,.pdf',
+        ],
+        'intimation_claim' => [
+            'title' => 'Intimation Claim',
+            'description' => 'Attach the intimation claim file for the selected period.',
+            'extensions' => 'xlsx,xls,csv,pdf',
+            'accept' => '.xlsx,.xls,.csv,.pdf',
+        ],
+    ];
+
     public function index(Request $request): View
     {
         $monthNames = $this->bsMonthNames();
@@ -162,7 +195,7 @@ class ImportLogController extends Controller
 
         $selectedImportLog = collect($createdImportLogs)->firstWhere('upload_type', 'irms') ?? $createdImportLogs[0];
 
-        return redirect()->route('upload.create')
+        return redirect()->route('upload.type', $selectedImportLog->upload_type ?: 'irms')
             ->with('selected_import_log_id', $selectedImportLog->id)
             ->with('toast', [
                 'message' => count($createdImportLogs).' file(s) uploaded successfully. Use the IRMS file for database import.',
@@ -170,9 +203,83 @@ class ImportLogController extends Controller
             ]);
     }
 
+    public function createForType(string $type): View
+    {
+        abort_unless(array_key_exists($type, self::UPLOAD_TYPE_META), 404);
+
+        $meta = self::UPLOAD_TYPE_META[$type];
+        $today = now();
+        $currentPeriod = $this->currentBsPeriod($today);
+        $monthNames = $this->bsMonthNames();
+        $submissionDateBs = $this->currentBsDate($today, $monthNames);
+        $fiscalYearOptions = $this->fiscalYearOptions($currentPeriod['fiscal_year']);
+        $recentUploads = ImportLog::where('upload_type', $type)
+            ->latest('date')
+            ->latest('id')
+            ->limit(8)
+            ->get();
+        $selectedImportLogId = session('selected_import_log_id');
+        $selectedImportLog = $selectedImportLogId ? ImportLog::find($selectedImportLogId) : $recentUploads->first();
+
+        return view('import-logs.upload-type', compact(
+            'type',
+            'meta',
+            'recentUploads',
+            'currentPeriod',
+            'monthNames',
+            'submissionDateBs',
+            'fiscalYearOptions',
+            'selectedImportLog'
+        ));
+    }
+
+    public function storeForType(Request $request, string $type): RedirectResponse
+    {
+        abort_unless(array_key_exists($type, self::UPLOAD_TYPE_META), 404);
+
+        $meta = self::UPLOAD_TYPE_META[$type];
+        $fieldName = self::UPLOAD_FIELD_MAP[$type];
+
+        $validated = $request->validate([
+            'fiscal_year' => ['required', 'string', 'max:255'],
+            'month' => ['required', 'integer', 'min:1', 'max:12'],
+            $fieldName => ['required', 'file', 'mimes:'.$meta['extensions'], 'max:20480'],
+        ]);
+
+        $today = now();
+        $file = $request->file($fieldName);
+        $extension = $file->getClientOriginalExtension();
+        $baseName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $safeName = preg_replace('/[^A-Za-z0-9_-]/', '-', $baseName);
+        $fileName = $today->format('YmdHis').'-'.$type.'-'.$safeName.'.'.$extension;
+        $fiscalYearFolder = str_replace(['/', '\\'], '-', $validated['fiscal_year']);
+        $monthFolder = str_pad((string) $validated['month'], 2, '0', STR_PAD_LEFT);
+        $storagePath = 'uploads/'.$type.'/'.$fiscalYearFolder.'/'.$monthFolder;
+        $storedFile = $file->storeAs($storagePath, $fileName, 'public');
+
+        $importLog = ImportLog::create([
+            'date' => $today->toDateString(),
+            'user_id' => auth()->id(),
+            'upload_type' => $type,
+            'file_name' => $storedFile,
+            'fiscal_year' => $validated['fiscal_year'],
+            'month' => $validated['month'],
+            'status' => 'pending',
+        ]);
+
+        return redirect()->route('upload.type', $type)
+            ->with('selected_import_log_id', $importLog->id)
+            ->with('toast', [
+                'message' => $meta['title'].' file uploaded successfully.',
+                'type' => 'success',
+            ]);
+    }
+
     public function import(ImportLog $importLog): RedirectResponse
     {
-        return $this->performImport($importLog, 'upload.create');
+        $redirectType = $importLog->upload_type ?: 'irms';
+
+        return $this->performImport($importLog, 'upload.type', ['type' => $redirectType]);
     }
 
     public function importFromModule(Request $request): RedirectResponse
@@ -256,10 +363,10 @@ class ImportLogController extends Controller
         ]);
     }
 
-    private function performImport(ImportLog $importLog, string $redirectRoute): RedirectResponse
+    private function performImport(ImportLog $importLog, string $redirectRoute, array $routeParams = []): RedirectResponse
     {
         if ($importLog->status === 'completed') {
-            return redirect()->route($redirectRoute)
+            return redirect()->route($redirectRoute, $routeParams)
                 ->with('selected_import_log_id', $importLog->id)
                 ->with('toast', [
                     'message' => 'This file has already been imported.',
@@ -290,14 +397,14 @@ class ImportLogController extends Controller
         } catch (\Throwable $exception) {
             $importLog->update(['status' => 'failed']);
 
-            return redirect()->route($redirectRoute)
+            return redirect()->route($redirectRoute, $routeParams)
                 ->with('selected_import_log_id', $importLog->id)
                 ->withErrors([
                     'file' => 'Import failed: '.$exception->getMessage(),
                 ]);
         }
 
-        return redirect()->route($redirectRoute)
+        return redirect()->route($redirectRoute, $routeParams)
             ->with('selected_import_log_id', $importLog->id)
             ->with('toast', [
                 'message' => 'Data imported into the database successfully.',
