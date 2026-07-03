@@ -23,23 +23,27 @@
     <form method="POST" action="{{ route('upload.store') }}" enctype="multipart/form-data" id="uploadForm">
         @csrf
 
-        <div class="card mb-4" style="border-top:4px solid var(--danger);">
-            <div class="card-body" style="display:flex; flex-wrap:wrap; gap:16px; align-items:center; justify-content:space-between;">
+        {{-- Page header --}}
+        <div class="card mb-6" style="border-top:4px solid var(--brand);">
+            <div class="card-body" style="display:flex; flex-wrap:wrap; gap:20px; align-items:center; justify-content:space-between;">
                 <div>
-                    <div class="text-muted" style="font-size:13px; letter-spacing:.08em; text-transform:uppercase; font-weight:700; color:var(--danger);">Upload workspace</div>
-                    <h2 style="margin:6px 0 8px; font-size:26px; color:var(--ink);">Separate file uploads, one record per file</h2>
-                    <div class="text-muted" style="max-width:760px; font-size:14px; line-height:1.7;">Each file is stored in its own folder and saved as its own database record. Every uploaded file shows the same import action, and the database history stays separate from upload history.</div>
+                    <div class="text-muted" style="font-size:12px; letter-spacing:.1em; text-transform:uppercase; font-weight:800; color:var(--brand);">Upload workspace</div>
+                    <h2 style="margin:8px 0 6px; font-size:24px; color:var(--ink); font-weight:800;">Separate file uploads, one record per file</h2>
+                    <div class="text-muted" style="max-width:720px; font-size:13.5px; line-height:1.7;">Each file is stored in its own folder and saved as its own database record. Upload one or many files for the selected reporting period.</div>
                 </div>
-                <div class="kpi" style="min-width:170px;">
+                <div class="kpi" style="min-width:160px;">
                     <div class="label">Upload slots</div>
                     <div class="value">5</div>
-                    <div class="text-muted" style="font-size:13px; margin-top:4px;">Backend enabled</div>
+                    <div class="text-muted" style="font-size:12px; margin-top:4px;">Backend enabled</div>
                 </div>
             </div>
         </div>
 
         <div class="grid cols-3 mb-6">
+            {{-- Main column --}}
             <div style="grid-column: span 2;">
+
+                {{-- Reporting period --}}
                 <div class="card">
                     <div class="card-head">
                         <h2>Reporting period</h2>
@@ -81,19 +85,20 @@
                     </div>
                 </div>
 
+                {{-- Upload files --}}
                 <div class="card mt-4">
                     <div class="card-head">
                         <h2>Upload files separately</h2>
-                        <span class="badge warning">UI + backend</span>
+                        <!-- <span class="badge warning">UI + backend</span> -->
                     </div>
                     <div class="card-body">
-                        <div class="grid cols-2" style="gap:16px;">
+                        <div class="grid" style="grid-template-columns: 1fr; gap:16px;">
                             @foreach ($uploadCategories as $category)
-                                <div class="card" data-upload-card="{{ $category['key'] }}" style="border:1px solid var(--line); box-shadow:none; background:#fff; border-top:3px solid var(--danger);">
+                                <div class="card" data-upload-card="{{ $category['key'] }}" style="border:1px solid var(--line); box-shadow:none; background:#fff; border-left:4px solid var(--brand);">
                                     <div class="card-body" style="display:grid; gap:14px;">
                                         <div class="flex between center" style="gap:12px; align-items:flex-start;">
                                             <div>
-                                                <div style="font-size:18px; font-weight:700; color:var(--ink);">{{ $category['title'] }}</div>
+                                                <div style="font-size:17px; font-weight:800; color:var(--ink);">{{ $category['title'] }}</div>
                                                 <div class="text-muted" style="font-size:13px; margin-top:4px; line-height:1.6;">{{ $category['description'] }}</div>
                                             </div>
                                             <span class="badge info" data-upload-badge>Pending</span>
@@ -102,7 +107,7 @@
                                         @php
                                             $acceptTypes = $category['key'] === 'irms' ? '.xlsx,.xls,.csv' : '.xlsx,.xls,.csv,.pdf';
                                         @endphp
-                                        <label class="dropzone" data-dropzone data-target="{{ $category['key'] }}" style="min-height:160px; border-style:dashed; background:#fafafa;">
+                                        <label class="dropzone" data-dropzone data-target="{{ $category['key'] }}" style="min-height:150px; border-style:dashed; background:#fafafa;">
                                             <input type="file" name="{{ $category['key'] }}_file" id="{{ $category['key'] }}_file" data-upload-input data-target="{{ $category['key'] }}" accept="{{ $acceptTypes }}" hidden>
                                             <div class="icon" aria-hidden="true">
                                                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -126,55 +131,15 @@
                     </div>
                 </div>
 
-                <div class="card mt-4">
-                    <div class="card-head">
-                        <h2>Import to Database</h2>
-                        <span class="badge success">Same action for all</span>
-                    </div>
-                    <div class="card-body">
-                        @if ($selectedImportLog)
-                            <div class="grid cols-4 mb-4">
-                                <div class="kpi">
-                                    <div class="label">Ready file</div>
-                                    <div class="value" style="font-size:13px; font-weight:500; line-height:1.4; overflow-wrap:anywhere;">{{ basename($selectedImportLog->file_name) }}</div>
-                                </div>
-                                <div class="kpi">
-                                    <div class="label">Type</div>
-                                    <div class="value">{{ $uploadTypeLabels[$selectedImportLog->upload_type ?? 'irms'] ?? ucfirst(str_replace('_', ' ', $selectedImportLog->upload_type ?? 'irms')) }}</div>
-                                </div>
-                                <div class="kpi">
-                                    <div class="label">Month</div>
-                                    <div class="value">{{ $monthNames[$selectedImportLog->month] ?? $selectedImportLog->month }}</div>
-                                </div>
-                                <div class="kpi">
-                                    <div class="label">Status</div>
-                                    <div class="value" style="font-size:18px;">{{ ucfirst($selectedImportLog->status) }}</div>
-                                </div>
-                            </div>
-
-                            <div class="text-muted" style="font-size:13px; margin-bottom:16px;">Choose any uploaded file from the history list to open the import module for that record.</div>
-
-                            <div class="flex gap-3 mt-4">
-                                <a href="{{ route('upload.import-module', ['import_log_id' => $selectedImportLog->id]) }}" class="btn btn-primary">Open Import Module</a>
-                                <a href="{{ route('upload.database-history') }}" class="btn btn-outline">View Database History</a>
-                            </div>
-                        @else
-                            <div class="text-muted" style="font-size:13px;">Upload any file first. Once it is stored, the database import module will be ready.</div>
-                            <div class="flex gap-3 mt-4">
-                                <button type="button" class="btn btn-primary" disabled>Open Import Module</button>
-                                <a href="{{ route('upload.database-history') }}" class="btn btn-outline">View Database History</a>
-                            </div>
-                        @endif
-                    </div>
-                </div>
-
+                {{-- Actions --}}
                 <div class="flex gap-3 mt-4">
                     <button type="submit" class="btn btn-primary">Save Uploads</button>
                     <a href="{{ route('dashboard') }}" class="btn btn-outline">Cancel</a>
                 </div>
             </div>
 
-            <div>
+            {{-- Sidebar --}}
+            <div style="position: sticky; top: 24px; align-self: start; max-height: calc(100vh - 48px); overflow-y: auto;">
                 <div class="card">
                     <div class="card-head">
                         <h2>Selected files</h2>
@@ -201,7 +166,7 @@
                     </div>
                 </div>
 
-                <div class="card">
+                <div class="card mt-4">
                     <div class="card-head">
                         <h2>Saved uploads</h2>
                     </div>
