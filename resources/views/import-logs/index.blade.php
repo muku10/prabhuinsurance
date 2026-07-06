@@ -52,7 +52,6 @@
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Month</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created By</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Import Token</th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
@@ -60,7 +59,7 @@
                                 @forelse ($importLogs as $log)
                                     <tr class="hover:bg-gray-50">
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $loop->iteration }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ ucfirst(str_replace('_', ' ', $log->upload_type ?? 'irms')) }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ ucfirst(str_replace('_', ' ', $log->upload_type ?? 'premium')) }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $log->date->format('Y-m-d') }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><a href="{{ asset('storage/'.$log->file_name) }}" target="_blank" class="text-prabhu-red-600 hover:text-prabhu-red-900">{{ basename($log->file_name) }}</a></td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $log->fiscal_year }}</td>
@@ -77,7 +76,6 @@
                                                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Failed</span>
                                             @endif
                                         </td>
-                                        <td class="px-6 py-4 text-sm text-gray-500">{{ $log->transactions()->value('import_batch_token') ?? '-' }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right space-x-2">
                                             <a href="{{ route('import-logs.edit', $log->id) }}" class="text-prabhu-red-600 hover:text-prabhu-red-900">Edit</a>
                                             <button
@@ -99,7 +97,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="10" class="px-6 py-12 text-center text-gray-500">No import logs found.</td>
+                                        <td colspan="9" class="px-6 py-12 text-center text-gray-500">No import logs found.</td>
                                     </tr>
                                 @endforelse
                             </tbody>

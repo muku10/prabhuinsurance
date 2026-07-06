@@ -7,7 +7,7 @@
     @php
         $fieldName = $type.'_file';
         $uploadTypeLabels = [
-            'irms' => 'IRMS',
+            'premium' => 'Premium',
             'outstanding_claim' => 'Outstanding Claim',
             'paid_claim' => 'Paid Claim',
             'withdrawal_claim' => 'Withdrawal Claim',
@@ -128,7 +128,7 @@
                                 </div>
                                 <div class="kpi">
                                     <div class="label">Type</div>
-                                    <div class="value">{{ $uploadTypeLabels[$selectedImportLog->upload_type ?? 'irms'] ?? ucfirst(str_replace('_', ' ', $selectedImportLog->upload_type ?? 'irms')) }}</div>
+                                    <div class="value">{{ $uploadTypeLabels[$selectedImportLog->upload_type ?? 'premium'] ?? ucfirst(str_replace('_', ' ', $selectedImportLog->upload_type ?? 'premium')) }}</div>
                                 </div>
                                 <div class="kpi">
                                     <div class="label">Month</div>

@@ -27,11 +27,11 @@
                                         value="{{ $log->id }}"
                                         data-fiscal-year="{{ $log->fiscal_year }}"
                                         data-month="{{ $monthNames[$log->month] ?? $log->month }}"
-                                        data-type="{{ ucfirst(str_replace('_', ' ', $log->upload_type ?? 'irms')) }}"
+                                        data-type="{{ ucfirst(str_replace('_', ' ', $log->upload_type ?? 'premium')) }}"
                                         data-status="{{ ucfirst($log->status) }}"
                                         @selected((int) old('import_log_id', $selectedImportLog?->id) === $log->id)
                                     >
-                                        {{ ucfirst(str_replace('_', ' ', $log->upload_type ?? 'irms')) }} - {{ basename($log->file_name) }} - FY {{ $log->fiscal_year }} - {{ $monthNames[$log->month] ?? $log->month }}
+                                        {{ ucfirst(str_replace('_', ' ', $log->upload_type ?? 'premium')) }} - {{ basename($log->file_name) }} - FY {{ $log->fiscal_year }} - {{ $monthNames[$log->month] ?? $log->month }}
                                     </option>
                                 @endforeach
                             </select>
@@ -51,7 +51,7 @@
                             </div>
                             <div class="kpi">
                                 <div class="label">Type</div>
-                                <div class="value" id="selectedType">{{ $selectedImportLog ? ucfirst(str_replace('_', ' ', $selectedImportLog->upload_type ?? 'irms')) : '-' }}</div>
+                                <div class="value" id="selectedType">{{ $selectedImportLog ? ucfirst(str_replace('_', ' ', $selectedImportLog->upload_type ?? 'premium')) : '-' }}</div>
                             </div>
                             <div class="kpi">
                                 <div class="label">Status</div>

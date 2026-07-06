@@ -30,11 +30,6 @@ class ImportLog extends Model
         return $this->belongsTo(User::class, 'user_id', 'user_id');
     }
 
-    public function transactions(): HasMany
-    {
-        return $this->hasMany(Premium::class);
-    }
-
     public function premiums(): HasMany
     {
         return $this->hasMany(Premium::class);

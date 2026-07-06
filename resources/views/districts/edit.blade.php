@@ -47,7 +47,7 @@
                 <div class="card-body" style="font-size:13.5px; color: var(--ink-soft); line-height:1.7;">
                     <ul style="list-style:disc outside; padding-left:22px; margin:0; display:grid; gap:6px; color:var(--brand);">
                         <li><span style="color:var(--ink-soft);">Each district belongs to exactly one province.</span></li>
-                        <li><span style="color:var(--ink-soft);">District names are used in branches and IRMS data.</span></li>
+                        <li><span style="color:var(--ink-soft);">District names are used in branches and premium data.</span></li>
                         <li><span style="color:var(--ink-soft);">Changing the province re-links all branches under it.</span></li>
                     </ul>
                 </div>

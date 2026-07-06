@@ -59,14 +59,14 @@
                     <tbody>
                         @forelse ($importHistory as $history)
                             @php
-                                $recordCount = match ($history->upload_type ?? 'irms') {
+                                $recordCount = match ($history->upload_type ?? 'premium') {
                                     'intimation_claim' => $history->intimation_claims_count,
                                     'paid_claim' => $history->paid_claims_count,
                                     'withdrawal_claim' => $history->withdrawal_claims_count,
                                     'outstanding_claim' => $history->outstanding_claims_count,
                                     default => $history->premiums_count,
                                 };
-                                $typeLabel = ucfirst(str_replace('_', ' ', $history->upload_type ?? 'irms'));
+                                $typeLabel = ucfirst(str_replace('_', ' ', $history->upload_type ?? 'premium'));
                             @endphp
                             <tr>
                                 <td>{{ $loop->iteration }}</td>

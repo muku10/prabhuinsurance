@@ -59,7 +59,7 @@
                         <tbody>
                             @forelse ($recentUploads as $upload)
                                 <tr>
-                                    <td>{{ ucfirst(str_replace('_', ' ', $upload->upload_type ?? 'irms')) }}</td>
+                                    <td>{{ ucfirst(str_replace('_', ' ', $upload->upload_type ?? 'premium')) }}</td>
                                     <td>{{ basename($upload->file_name) }}</td>
                                     <td>{{ $upload->fiscal_year }}</td>
                                     <td>{{ $monthNames[$upload->month] ?? $upload->month }}</td>

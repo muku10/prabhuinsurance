@@ -11,7 +11,6 @@ class Premium extends Model
 
     protected $fillable = [
         'import_log_id',
-        'import_batch_token',
         'state_id',
         'district_id',
         'fiscal_year',

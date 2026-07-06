@@ -4,7 +4,7 @@
 
     @php
         $uploadCategories = [
-            ['key' => 'irms', 'title' => 'IRMS', 'description' => 'Upload the core IRMS workbook for the selected period.'],
+            ['key' => 'premium', 'title' => 'Premium', 'description' => 'Upload the core Premium workbook for the selected period.'],
             ['key' => 'outstanding_claim', 'title' => 'Outstanding Claim', 'description' => 'Attach the outstanding claim file separately.'],
             ['key' => 'paid_claim', 'title' => 'Paid Claim', 'description' => 'Attach the paid claim file separately.'],
             ['key' => 'withdrawal_claim', 'title' => 'Withdrawal Claim', 'description' => 'Attach the withdrawal claim file separately.'],
@@ -12,7 +12,7 @@
         ];
 
         $uploadTypeLabels = [
-            'irms' => 'IRMS',
+            'premium' => 'Premium',
             'outstanding_claim' => 'Outstanding Claim',
             'paid_claim' => 'Paid Claim',
             'withdrawal_claim' => 'Withdrawal Claim',
@@ -105,7 +105,7 @@
                                         </div>
 
                                         @php
-                                            $acceptTypes = $category['key'] === 'irms' ? '.xlsx,.xls,.csv' : '.xlsx,.xls,.csv,.pdf';
+                                            $acceptTypes = $category['key'] === 'premium' ? '.xlsx,.xls,.csv' : '.xlsx,.xls,.csv,.pdf';
                                         @endphp
                                         <label class="dropzone" data-dropzone data-target="{{ $category['key'] }}" style="min-height:150px; border-style:dashed; background:#fafafa;">
                                             <input type="file" name="{{ $category['key'] }}_file" id="{{ $category['key'] }}_file" data-upload-input data-target="{{ $category['key'] }}" accept="{{ $acceptTypes }}" hidden>
@@ -117,7 +117,7 @@
                                                 </svg>
                                             </div>
                                             <h3 id="{{ $category['key'] }}_title" style="margin:0;">Drop {{ $category['title'] }} file here</h3>
-                                            <p id="{{ $category['key'] }}_text" style="margin:0;">or click to browse - Accepted: {{ $category['key'] === 'irms' ? '.xlsx, .xls, .csv' : '.xlsx, .xls, .csv, .pdf' }}</p>
+                                            <p id="{{ $category['key'] }}_text" style="margin:0;">or click to browse - Accepted: {{ $category['key'] === 'premium' ? '.xlsx, .xls, .csv' : '.xlsx, .xls, .csv, .pdf' }}</p>
                                         </label>
 
                                         <div class="flex between center" style="gap:12px;">
@@ -184,7 +184,7 @@
                             <tbody>
                                 @forelse ($recentUploads as $upload)
                                     <tr>
-                                        <td>{{ $uploadTypeLabels[$upload->upload_type ?? 'irms'] ?? ucfirst(str_replace('_', ' ', $upload->upload_type ?? 'irms')) }}</td>
+                                        <td>{{ $uploadTypeLabels[$upload->upload_type ?? 'premium'] ?? ucfirst(str_replace('_', ' ', $upload->upload_type ?? 'premium')) }}</td>
                                         <td>
                                             <a href="{{ asset('storage/'.$upload->file_name) }}" target="_blank" style="font-weight:500; color:var(--ink);">{{ basename($upload->file_name) }}</a>
                                             <div class="text-muted" style="font-size:12px; margin-top:2px;">FY {{ $upload->fiscal_year }}</div>

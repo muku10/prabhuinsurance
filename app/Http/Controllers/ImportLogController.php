@@ -10,9 +10,7 @@ use App\Models\IntimationClaim;
 use App\Models\OutstandingClaim;
 use App\Models\PaidClaim;
 use App\Models\Premium;
-use App\Models\Policy;
 use App\Models\Province;
-use App\Models\Transaction;
 use App\Models\WithdrawalClaim;
 use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
@@ -26,13 +24,10 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ImportLogController extends Controller
 {
-    private const SHEET_TRANSACTIONS = 0;
-    private const SHEET_COMPLAINS = 1;
-    private const SHEET_BRANCH_NETWORK = 2;
-    private const IMPORTABLE_UPLOAD_TYPES = ['irms'];
+    private const IMPORTABLE_UPLOAD_TYPES = ['premium'];
 
     private const UPLOAD_FIELD_MAP = [
-        'irms' => 'irms_file',
+        'premium' => 'premium_file',
         'outstanding_claim' => 'outstanding_claim_file',
         'paid_claim' => 'paid_claim_file',
         'withdrawal_claim' => 'withdrawal_claim_file',
@@ -119,7 +114,7 @@ class ImportLogController extends Controller
         $request->validate([
             'fiscal_year' => ['required', 'string', 'max:255'],
             'month' => ['required', 'integer', 'min:1', 'max:12'],
-            'irms_file' => ['nullable', 'file', 'mimes:xlsx,xls,csv', 'max:20480'],
+            'premium_file' => ['nullable', 'file', 'mimes:xlsx,xls,csv', 'max:20480'],
             'outstanding_claim_file' => ['nullable', 'file', 'mimes:xlsx,xls,csv,pdf', 'max:20480'],
             'paid_claim_file' => ['nullable', 'file', 'mimes:xlsx,xls,csv,pdf', 'max:20480'],
             'withdrawal_claim_file' => ['nullable', 'file', 'mimes:xlsx,xls,csv,pdf', 'max:20480'],
@@ -160,12 +155,12 @@ class ImportLogController extends Controller
             ])->withInput();
         }
 
-        $selectedImportLog = collect($createdImportLogs)->firstWhere('upload_type', 'irms') ?? $createdImportLogs[0];
+        $selectedImportLog = collect($createdImportLogs)->firstWhere('upload_type', 'premium') ?? $createdImportLogs[0];
 
         return redirect()->route('upload.create')
             ->with('selected_import_log_id', $selectedImportLog->id)
             ->with('toast', [
-                'message' => count($createdImportLogs).' file(s) uploaded successfully. Use the IRMS file for database import.',
+                'message' => count($createdImportLogs).' file(s) uploaded successfully. Use the Premium file for database import.',
                 'type' => 'success',
             ]);
     }
@@ -646,9 +641,7 @@ class ImportLogController extends Controller
 
     private function normalizeUploadType(?string $uploadType): string
     {
-        $normalized = $uploadType ? strtolower(trim($uploadType)) : 'premium';
-
-        return $normalized === 'irms' ? 'premium' : $normalized;
+        return $uploadType ? strtolower(trim($uploadType)) : 'premium';
     }
 
     private function buildRowsForUploadType($spreadsheet, ImportLog $importLog, string $uploadType): array
@@ -661,119 +654,6 @@ class ImportLogController extends Controller
             'outstanding_claim' => [OutstandingClaim::class, $this->buildOutstandingClaimRowsFromUpload($spreadsheet, $importLog)],
             default => throw new \RuntimeException('Unsupported upload type: '.$uploadType),
         };
-    }
-
-    private function buildTransactionsFromUpload($spreadsheet, ImportLog $importLog, string $fiscalYear, int $selectedMonth, string $importBatchToken): array
-    {
-        $worksheet = $spreadsheet->getActiveSheet();
-        $rows = $worksheet->toArray(null, true, true, false);
-
-        if (count($rows) < 2) {
-            return [];
-        }
-
-        $headerIndex = $this->findTransactionHeaderRowIndex($rows);
-
-        if ($headerIndex === null) {
-            throw new \RuntimeException('The uploaded file is missing the required transaction headers.');
-        }
-
-        $headers = array_map(fn ($value) => $this->normalizeHeader((string) $value), $rows[$headerIndex]);
-        $transactions = [];
-        $timestamp = now();
-        $validProvinceIds = Province::query()->pluck('province_id')->flip();
-        $validDistrictIds = District::query()->pluck('district_id')->flip();
-        $validPolicyIds = Policy::query()->pluck('policy_id')->flip();
-
-        foreach (array_slice($rows, $headerIndex + 1) as $row) {
-            $mappedRow = [];
-
-            foreach ($headers as $index => $header) {
-                if ($header === '') {
-                    continue;
-                }
-
-                $mappedRow[$header] = $row[$index] ?? null;
-            }
-
-            if (! $this->isTransactionRow($mappedRow)) {
-                continue;
-            }
-
-            $stateId = $this->sanitizeForeignKey($mappedRow['stateid'] ?? null, $validProvinceIds);
-            $districtId = $this->sanitizeForeignKey($mappedRow['districtid'] ?? null, $validDistrictIds);
-            $policyId = $this->sanitizeForeignKey($mappedRow['staticpoliciesid'] ?? null, $validPolicyIds);
-            $subPolicyId = $this->sanitizeForeignKey($mappedRow['staticsubpoliciesid'] ?? null, $validPolicyIds);
-
-            $transactions[] = [
-                'import_log_id' => $importLog->id,
-                'import_batch_token' => $importBatchToken,
-                'state_id' => $stateId,
-                'district_id' => $districtId,
-                'static_policies_id' => $policyId,
-                'static_sub_policies_id' => $subPolicyId,
-                'fiscal_year' => $fiscalYear,
-                'month' => $this->nullableInteger($mappedRow['month'] ?? null) ?? $selectedMonth,
-                'number_of_issued_policy' => $this->numericInteger($mappedRow['numberofissuedpolicy'] ?? null),
-                'as_on_issued_policy' => $this->numericInteger($mappedRow['asonissuedpolicy'] ?? null),
-                'gross_premium_income' => $this->numericDecimal($mappedRow['grosspremiumincome'] ?? null),
-                'sum_insured' => $this->numericDecimal($mappedRow['suminsured'] ?? null),
-                'number_of_gross_claim' => $this->numericInteger($mappedRow['numberofgrossclaim'] ?? null),
-                'amount_of_gross_claim' => $this->numericDecimal($mappedRow['amountofgrossclaim'] ?? null),
-                'number_of_gross_claim_paid' => $this->numericInteger($mappedRow['numberofgrossclaimpaid'] ?? null),
-                'amount_of_gross_claim_paid' => $this->numericDecimal($mappedRow['amountofgrossclaimpaid'] ?? null),
-                'number_of_outstanding_claim' => $this->numericInteger($mappedRow['numberofoutstandingclaim'] ?? null),
-                'amount_of_outstanding_claim' => $this->numericDecimal($mappedRow['amountofoutstandingclaim'] ?? null),
-                'remarks' => $this->nullableString($mappedRow['remarks'] ?? null),
-                'created_at' => $timestamp,
-                'updated_at' => $timestamp,
-            ];
-        }
-
-        return $transactions;
-    }
-
-    private function findTransactionHeaderRowIndex(array $rows): ?int
-    {
-        $requiredHeaders = [
-            'stateid',
-            'districtid',
-            'month',
-            'staticpoliciesid',
-            'staticsubpoliciesid',
-            'numberofissuedpolicy',
-            'asonissuedpolicy',
-            'grosspremiumincome',
-            'suminsured',
-            'numberofgrossclaim',
-            'amountofgrossclaim',
-            'numberofgrossclaimpaid',
-            'amountofgrossclaimpaid',
-            'numberofoutstandingclaim',
-            'amountofoutstandingclaim',
-            'remarks',
-        ];
-
-        foreach ($rows as $index => $row) {
-            $normalizedRow = array_map(fn ($value) => $this->normalizeHeader((string) $value), $row);
-
-            if (empty(array_diff($requiredHeaders, $normalizedRow))) {
-                return $index;
-            }
-        }
-
-        return null;
-    }
-
-    private function isTransactionRow(array $mappedRow): bool
-    {
-        $requiredIds = [
-            $this->nullableInteger($mappedRow['stateid'] ?? null),
-            $this->nullableInteger($mappedRow['districtid'] ?? null),
-            $this->nullableInteger($mappedRow['staticpoliciesid'] ?? null),
-        ];
-
-        return count(array_filter($requiredIds, fn ($value) => $value !== null)) === count($requiredIds);
     }
 
     private function buildComplainsFromUpload($spreadsheet, ImportLog $importLog, string $fiscalYear, int $selectedMonth): array

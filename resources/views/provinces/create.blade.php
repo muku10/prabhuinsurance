@@ -33,7 +33,7 @@
                 <div class="card-head"><h2>Tips</h2></div>
                 <div class="card-body" style="font-size:13.5px; color: var(--ink-soft); line-height:1.7;">
                     <ul style="list-style:disc outside; padding-left:22px; margin:0; display:grid; gap:6px; color:var(--brand);">
-                        <li><span style="color:var(--ink-soft);">Use the official province name as recorded in IRMS.</span></li>
+                        <li><span style="color:var(--ink-soft);">Use the official province name as recorded in premium data.</span></li>
                         <li><span style="color:var(--ink-soft);">Provinces are referenced by districts and branches.</span></li>
                         <li><span style="color:var(--ink-soft);">You can edit or delete a province later.</span></li>
                     </ul>

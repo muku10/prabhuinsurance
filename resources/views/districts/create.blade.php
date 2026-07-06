@@ -46,7 +46,7 @@
                 <div class="card-body" style="font-size:13.5px; color: var(--ink-soft); line-height:1.7;">
                     <ul style="list-style:disc outside; padding-left:22px; margin:0; display:grid; gap:6px; color:var(--brand);">
                         <li><span style="color:var(--ink-soft);">Pick the province this district belongs to.</span></li>
-                        <li><span style="color:var(--ink-soft);">Use the official district name as in IRMS.</span></li>
+                        <li><span style="color:var(--ink-soft);">Use the official district name as in premium data.</span></li>
                         <li><span style="color:var(--ink-soft);">You can edit or delete a district later.</span></li>
                     </ul>
                 </div>
