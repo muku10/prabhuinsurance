@@ -10,22 +10,16 @@ class Branch extends Model
     protected $table = 'branch_network';
 
     protected $fillable = [
-        'import_log_id',
+        'branch_code',
+        'ext_branch_code',
+        'branch_name',
         'province_id',
         'district_id',
-        'fiscal_year',
-        'year',
-        'month',
-        'number_of_branch',
-        'number_of_agents',
-        'number_of_surveyors',
+        'local_level',
+        'address',
+        'display_name',
         'status',
     ];
-
-    public function importLog(): BelongsTo
-    {
-        return $this->belongsTo(ImportLog::class);
-    }
 
     public function province(): BelongsTo
     {

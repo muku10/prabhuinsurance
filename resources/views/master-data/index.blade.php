@@ -7,6 +7,7 @@
             <a href="#" data-tab="prov" class="active">Provinces</a>
             <a href="#" data-tab="dist">Districts</a>
             <a href="#" data-tab="pt">Policy Types</a>
+            <a href="#" data-tab="br">Branches</a>
             <a href="#" data-tab="ct">Complain Types</a>
             <a href="#" data-tab="conf">Configuration</a>
         </nav>
@@ -101,6 +102,45 @@
                             </tr>
                         @empty
                             <tr><td colspan="4" class="text-muted">No policy types found.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+
+        {{-- ===================== BRANCHES ===================== --}}
+        <div data-tab-panel="br" class="hide">
+            <div class="flex between center mb-3">
+                <h2 style="margin:0; font-size:16px;">Branches ({{ $branches->count() }})</h2>
+                <button type="button" class="btn btn-primary" @click="addBranch()">+ Add Branch</button>
+            </div>
+            <div class="table-wrap">
+                <table class="t">
+                    <thead><tr><th>Code</th><th>Ext Code</th><th>Branch</th><th>Province</th><th>District</th><th>Local Level</th><th>Address</th><th class="text-right">Actions</th></tr></thead>
+                    <tbody>
+                        @forelse ($branches as $branch)
+                            <tr>
+                                <td>{{ $branch->branch_code }}</td>
+                                <td>{{ $branch->ext_branch_code }}</td>
+                                <td>{{ $branch->branch_name }}</td>
+                                <td>{{ $branch->province->province_name }}</td>
+                                <td>{{ $branch->district->district_name }}</td>
+                                <td>{{ $branch->local_level }}</td>
+                                <td>{{ $branch->address }}</td>
+                                <td class="text-right">
+                                    <button type="button" class="btn btn-ghost btn-sm"
+                                        @click='openBranch({{ $branch->id }}, {{ (int) $branch->branch_code }}, {{ json_encode($branch->ext_branch_code) }}, {{ json_encode($branch->branch_name) }}, {{ (int) $branch->province_id }}, {{ (int) $branch->district_id }}, {{ (int) ($branch->local_level ?? 0) }}, {{ json_encode($branch->address ?? '') }}, {{ json_encode($branch->display_name ?? '') }}, {{ json_encode($branch->status) }})'>Edit</button>
+                                    <form action="{{ route('branches.destroy', $branch->id) }}" method="POST" style="display:inline" onsubmit="return confirm('Delete this branch?')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <input type="hidden" name="_redirect" value="master-data">
+                                        <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger);">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="8" class="text-muted">No branches found.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -263,15 +303,71 @@
                 </form>
             </div>
         </div>
+
+        {{-- ============== BRANCH MODAL (Add / Edit) ============== --}}
+        <div class="modal-overlay" x-show="modals.branch" x-cloak x-transition.opacity @keydown.escape.window="closeAll()" @click.self="closeAll()">
+            <div class="modal-box" x-transition.scale.origin.center>
+                <div class="modal-head">
+                    <h3 x-text="branchForm.mode === 'create' ? 'Add Branch' : 'Edit Branch'">Edit Branch</h3>
+                    <button type="button" class="modal-close" @click="closeAll()">&times;</button>
+                </div>
+                <form :action="branchForm.action" method="POST">
+                    @csrf
+                    <input type="hidden" name="_redirect" value="master-data">
+                    <template x-if="branchForm.mode === 'edit'"><input type="hidden" name="_method" value="PUT"></template>
+                    <div class="modal-body">
+                        <div class="grid cols-2">
+                            <div class="field mb-4"><label for="branch_code">Branch Code</label><input class="input" id="branch_code" type="number" name="branch_code" x-model.number="branchForm.branchCode" required min="1"></div>
+                            <div class="field mb-4"><label for="ext_branch_code">Ext Branch Code</label><input class="input" id="ext_branch_code" type="text" name="ext_branch_code" x-model="branchForm.extBranchCode" required maxlength="10"></div>
+                            <div class="field mb-4"><label for="branch_name">Branch Name</label><input class="input" id="branch_name" type="text" name="branch_name" x-model="branchForm.branchName" required></div>
+                            <div class="field mb-4"><label for="branch_display_name">Display Name</label><input class="input" id="branch_display_name" type="text" name="display_name" x-model="branchForm.displayName"></div>
+                            <div class="field mb-4">
+                                <label for="branch_province_id">Province</label>
+                                <select class="input" id="branch_province_id" name="province_id" x-model="branchForm.provinceId" @change="branchForm.districtId = ''" required>
+                                    <option value="">Select Province</option>
+                                    @foreach ($allProvinces as $province)
+                                        <option value="{{ $province->province_id }}">{{ $province->province_name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="field mb-4">
+                                <label for="branch_district_id">District</label>
+                                <select class="input" id="branch_district_id" name="district_id" x-model="branchForm.districtId" :disabled="!branchForm.provinceId" required>
+                                    <option value="" x-text="branchForm.provinceId ? 'Select District' : 'Select Province First'"></option>
+                                    @foreach ($allDistricts as $district)
+                                        <option value="{{ $district->district_id }}" data-province-id="{{ $district->province_id }}" x-show="branchForm.provinceId === '{{ $district->province_id }}'">{{ $district->district_name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="field mb-4"><label for="local_level">Local Level</label><input class="input" id="local_level" type="number" name="local_level" x-model.number="branchForm.localLevel" min="1"></div>
+                            <div class="field mb-4"><label for="branch_address">Address</label><input class="input" id="branch_address" type="text" name="address" x-model="branchForm.address"></div>
+                            <div class="field mb-4">
+                                <label for="branch_status">Status</label>
+                                <select class="input" id="branch_status" name="status" x-model="branchForm.status" required>
+                                    <option value="active">Active</option>
+                                    <option value="inactive">Inactive</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-foot">
+                        <button type="button" class="btn btn-outline" @click="closeAll()">Cancel</button>
+                        <button type="submit" class="btn btn-primary" x-text="branchForm.mode === 'create' ? 'Save Branch' : 'Update Branch'">Update Branch</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
     </div>
 
     <script>
         function masterData() {
             return {
-                modals: { province: false, district: false, policy: false },
+                modals: { province: false, district: false, policy: false, branch: false },
                 provinceForm: { mode: 'create', action: '', name: '', code: '' },
                 districtForm: { mode: 'create', action: '', provinceId: '', name: '', code: '' },
                 policyForm: { mode: 'create', action: '', policyId: null, parentId: '', name: '', nameNp: '', code: '', status: 'active' },
+                branchForm: { mode: 'create', action: '', branchCode: null, extBranchCode: '', branchName: '', provinceId: '', districtId: '', localLevel: null, address: '', displayName: '', status: 'active' },
 
                 addProvince() {
                     this.closeAll();
@@ -290,6 +386,13 @@
                     this.districtForm.name = '';
                     this.districtForm.code = '';
                     this.modals.district = true;
+                },
+
+
+                addBranch() {
+                    this.closeAll();
+                    this.branchForm = { mode: 'create', action: '{{ route('branches.store') }}', branchCode: null, extBranchCode: '', branchName: '', provinceId: '', districtId: '', localLevel: null, address: '', displayName: '', status: 'active' };
+                    this.modals.branch = true;
                 },
 
                 addPolicy() {
@@ -337,10 +440,18 @@
                     this.modals.policy = true;
                 },
 
+
+                openBranch(id, branchCode, extBranchCode, branchName, provinceId, districtId, localLevel, address, displayName, status) {
+                    this.closeAll();
+                    this.branchForm = { mode: 'edit', action: '{{ route('branches.update', '__ID__') }}'.replace('__ID__', id), branchCode, extBranchCode, branchName, provinceId: String(provinceId), districtId: String(districtId), localLevel: localLevel || null, address, displayName, status };
+                    this.modals.branch = true;
+                },
+
                 closeAll() {
                     this.modals.province = false;
                     this.modals.district = false;
                     this.modals.policy = false;
+                    this.modals.branch = false;
                 },
             };
         }

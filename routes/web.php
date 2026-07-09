@@ -81,13 +81,15 @@ Route::middleware('auth')->group(function () {
         $provinces = Province::withCount(['districts', 'branches'])->orderBy('province_id')->get();
         $districts = District::with('province')->withCount('branches')->orderBy('district_id')->get();
         $policies = Policy::orderBy('policy_id')->get();
+        $branches = Branch::with(['province', 'district'])->orderBy('branch_code')->get();
         $complainTypes = DB::table('complain_types')->orderBy('id')->get();
 
         // For modal dropdowns
         $allProvinces = Province::orderBy('province_name')->get(['province_id', 'province_name']);
+        $allDistricts = District::with('province')->orderBy('district_name')->get(['district_id', 'province_id', 'district_name']);
         $parentPolicies = Policy::whereNull('parent_id')->orderBy('policy_name')->get(['policy_id', 'policy_name']);
 
-        return view('master-data.index', compact('provinces', 'districts', 'policies', 'complainTypes', 'allProvinces', 'parentPolicies'));
+        return view('master-data.index', compact('provinces', 'districts', 'policies', 'branches', 'complainTypes', 'allProvinces', 'allDistricts', 'parentPolicies'));
     })->name('master-data.index');
 
     Route::resource('users', UserController::class)->except(['show', 'create', 'store']);
