@@ -15,10 +15,14 @@ class Branch extends Model
         'branch_name',
         'province_id',
         'district_id',
+        'fiscal_year',
+        'month',
         'local_level',
         'address',
         'display_name',
         'status',
+        'inactive_fiscal_year',
+        'inactive_month',
     ];
 
     public function province(): BelongsTo

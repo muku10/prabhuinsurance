@@ -26,7 +26,7 @@
         </a>
 
         <div class="section">Reports</div>
-        <a href="#">
+        <a href="{{ route('public.view') }}" target="_blank" rel="noopener">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>Public View
         </a>
 

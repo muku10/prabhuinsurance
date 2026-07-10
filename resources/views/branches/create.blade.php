@@ -56,6 +56,28 @@
                                 <x-input-error :messages="$errors->get('district_id')" class="mt-2" />
                             </div>
                         </div>
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <x-input-label for="fiscal_year" :value="__('Fiscal Year')" />
+                                <select id="fiscal_year" name="fiscal_year" class="mt-1 block w-full border-gray-300 focus:border-prabhu-red-500 focus:ring-prabhu-red-500 rounded-md shadow-sm" required>
+                                    <option value="">Select Fiscal Year</option>
+                                    @foreach ($fiscalYears as $fiscalYear)
+                                        <option value="{{ $fiscalYear }}" {{ old('fiscal_year') === $fiscalYear ? 'selected' : '' }}>{{ $fiscalYear }}</option>
+                                    @endforeach
+                                </select>
+                                <x-input-error :messages="$errors->get('fiscal_year')" class="mt-2" />
+                            </div>
+                            <div>
+                                <x-input-label for="month" :value="__('Month')" />
+                                <select id="month" name="month" class="mt-1 block w-full border-gray-300 focus:border-prabhu-red-500 focus:ring-prabhu-red-500 rounded-md shadow-sm" required>
+                                    <option value="">Select Month</option>
+                                    @foreach ($monthNames as $monthValue => $monthName)
+                                        <option value="{{ $monthValue }}" {{ (string) old('month') === (string) $monthValue ? 'selected' : '' }}>{{ $monthName }}</option>
+                                    @endforeach
+                                </select>
+                                <x-input-error :messages="$errors->get('month')" class="mt-2" />
+                            </div>
+                        </div>
                         <div class="grid grid-cols-3 gap-4 mb-4">
                             <div>
                                 <x-input-label for="local_level" :value="__('Local Level')" />
@@ -81,6 +103,28 @@
                             </select>
                             <x-input-error :messages="$errors->get('status')" class="mt-2" />
                         </div>
+                        <div id="inactive_period_fields" class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <x-input-label for="inactive_fiscal_year" :value="__('Inactive Fiscal Year')" />
+                                <select id="inactive_fiscal_year" name="inactive_fiscal_year" class="mt-1 block w-full border-gray-300 focus:border-prabhu-red-500 focus:ring-prabhu-red-500 rounded-md shadow-sm">
+                                    <option value="">Select Fiscal Year</option>
+                                    @foreach ($fiscalYears as $fiscalYear)
+                                        <option value="{{ $fiscalYear }}" {{ old('inactive_fiscal_year') === $fiscalYear ? 'selected' : '' }}>{{ $fiscalYear }}</option>
+                                    @endforeach
+                                </select>
+                                <x-input-error :messages="$errors->get('inactive_fiscal_year')" class="mt-2" />
+                            </div>
+                            <div>
+                                <x-input-label for="inactive_month" :value="__('Inactive Month')" />
+                                <select id="inactive_month" name="inactive_month" class="mt-1 block w-full border-gray-300 focus:border-prabhu-red-500 focus:ring-prabhu-red-500 rounded-md shadow-sm">
+                                    <option value="">Select Month</option>
+                                    @foreach ($monthNames as $monthValue => $monthName)
+                                        <option value="{{ $monthValue }}" {{ (string) old('inactive_month') === (string) $monthValue ? 'selected' : '' }}>{{ $monthName }}</option>
+                                    @endforeach
+                                </select>
+                                <x-input-error :messages="$errors->get('inactive_month')" class="mt-2" />
+                            </div>
+                        </div>
                         <div class="flex items-center justify-end mt-6">
                             <x-primary-button>{{ __('Save') }}</x-primary-button>
                         </div>
@@ -94,6 +138,10 @@
         document.addEventListener('DOMContentLoaded', () => {
             const provinceSelect = document.getElementById('province_id');
             const districtSelect = document.getElementById('district_id');
+            const statusSelect = document.getElementById('status');
+            const inactivePeriodFields = document.getElementById('inactive_period_fields');
+            const inactiveFiscalYear = document.getElementById('inactive_fiscal_year');
+            const inactiveMonth = document.getElementById('inactive_month');
             const districtOptions = Array.from(districtSelect.options).slice(1);
 
             function filterDistricts(shouldReset = false) {
@@ -113,6 +161,22 @@
 
             provinceSelect.addEventListener('change', () => filterDistricts(true));
             filterDistricts(false);
+
+            function toggleInactivePeriodFields() {
+                const isInactive = statusSelect.value === 'inactive';
+
+                inactivePeriodFields.hidden = !isInactive;
+                inactiveFiscalYear.required = isInactive;
+                inactiveMonth.required = isInactive;
+
+                if (!isInactive) {
+                    inactiveFiscalYear.value = '';
+                    inactiveMonth.value = '';
+                }
+            }
+
+            statusSelect.addEventListener('change', toggleInactivePeriodFields);
+            toggleInactivePeriodFields();
         });
     </script>
 </x-app-layout>

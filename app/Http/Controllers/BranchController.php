@@ -17,14 +17,18 @@ class BranchController extends Controller
         $branches = Branch::with(['province', 'district'])
             ->orderBy('branch_code')
             ->get();
-        return view('branches.index', compact('branches'));
+        [, $monthNames] = $this->periodOptions();
+
+        return view('branches.index', compact('branches', 'monthNames'));
     }
 
     public function create(): View
     {
         $provinces = Province::orderBy('province_name')->get();
         $districts = District::orderBy('district_name')->get();
-        return view('branches.create', compact('provinces', 'districts'));
+        [$fiscalYears, $monthNames] = $this->periodOptions();
+
+        return view('branches.create', compact('provinces', 'districts', 'fiscalYears', 'monthNames'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -35,13 +39,18 @@ class BranchController extends Controller
             'branch_name' => ['required', 'string', 'max:255'],
             'province_id' => ['required', 'exists:provinces,province_id'],
             'district_id' => ['required', 'exists:districts,district_id'],
+            'fiscal_year' => ['required', 'string', 'max:255'],
+            'month' => ['required', 'integer', 'min:1', 'max:12'],
             'local_level' => ['nullable', 'integer', 'min:1'],
             'address' => ['nullable', 'string', 'max:255'],
             'display_name' => ['nullable', 'string', 'max:255'],
             'status' => ['required', 'in:active,inactive'],
+            'inactive_fiscal_year' => ['nullable', 'required_if:status,inactive', 'string', 'max:255'],
+            'inactive_month' => ['nullable', 'required_if:status,inactive', 'integer', 'min:1', 'max:12'],
         ]);
 
         $validated['display_name'] = ($validated['display_name'] ?? '') ?: $validated['branch_name'];
+        $this->clearInactivePeriodWhenActive($validated);
 
         Branch::create($validated);
 
@@ -55,7 +64,9 @@ class BranchController extends Controller
     {
         $provinces = Province::orderBy('province_name')->get();
         $districts = District::orderBy('district_name')->get();
-        return view('branches.edit', compact('branch', 'provinces', 'districts'));
+        [$fiscalYears, $monthNames] = $this->periodOptions();
+
+        return view('branches.edit', compact('branch', 'provinces', 'districts', 'fiscalYears', 'monthNames'));
     }
 
     public function update(Request $request, Branch $branch): RedirectResponse
@@ -66,13 +77,18 @@ class BranchController extends Controller
             'branch_name' => ['required', 'string', 'max:255'],
             'province_id' => ['required', 'exists:provinces,province_id'],
             'district_id' => ['required', 'exists:districts,district_id'],
+            'fiscal_year' => ['required', 'string', 'max:255'],
+            'month' => ['required', 'integer', 'min:1', 'max:12'],
             'local_level' => ['nullable', 'integer', 'min:1'],
             'address' => ['nullable', 'string', 'max:255'],
             'display_name' => ['nullable', 'string', 'max:255'],
             'status' => ['required', 'in:active,inactive'],
+            'inactive_fiscal_year' => ['nullable', 'required_if:status,inactive', 'string', 'max:255'],
+            'inactive_month' => ['nullable', 'required_if:status,inactive', 'integer', 'min:1', 'max:12'],
         ]);
 
         $validated['display_name'] = ($validated['display_name'] ?? '') ?: $validated['branch_name'];
+        $this->clearInactivePeriodWhenActive($validated);
 
         $branch->update($validated);
 
@@ -90,5 +106,43 @@ class BranchController extends Controller
             'message' => 'Branch deleted successfully.',
             'type' => 'success',
         ]);
+    }
+
+    private function periodOptions(): array
+    {
+        $monthNames = [
+            1 => 'Baisakh',
+            2 => 'Jestha',
+            3 => 'Asar',
+            4 => 'Shrawan',
+            5 => 'Bhadra',
+            6 => 'Ashwin',
+            7 => 'Kartik',
+            8 => 'Mangsir',
+            9 => 'Poush',
+            10 => 'Magh',
+            11 => 'Falgun',
+            12 => 'Chaitra',
+        ];
+
+        $fiscalYears = \App\Models\ImportLog::query()
+            ->whereNotNull('fiscal_year')
+            ->distinct()
+            ->orderByDesc('fiscal_year')
+            ->pluck('fiscal_year');
+
+        if ($fiscalYears->isEmpty()) {
+            $fiscalYears = collect(['2082-83', '2081-82', '2080-81', '2079-80', '2078-79']);
+        }
+
+        return [$fiscalYears, $monthNames];
+    }
+
+    private function clearInactivePeriodWhenActive(array &$validated): void
+    {
+        if (($validated['status'] ?? 'active') === 'active') {
+            $validated['inactive_fiscal_year'] = null;
+            $validated['inactive_month'] = null;
+        }
     }
 }

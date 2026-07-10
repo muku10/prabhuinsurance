@@ -88,7 +88,7 @@
                 <a class="btn btn-primary" href="{{ route('upload.create') }}">Upload New File</a>
                 <a class="btn btn-outline" href="{{ route('import-logs.index') }}">Upload History</a>
                 <a class="btn btn-outline" href="{{ route('master-data.index') }}">Manage Master Data</a>
-                <a class="btn btn-outline" href="{{ route('dashboard') }}">Public Dashboard</a>
+                <a class="btn btn-outline" href="{{ route('public.view') }}" target="_blank" rel="noopener">Public Dashboard</a>
                 <a class="btn btn-outline" href="{{ route('upload.create') }}">Download Template</a>
                 <div style="border-top:1px solid var(--line); margin:6px 0; padding-top:10px;">
                     <div class="text-muted" style="font-size:13px;">Logged in as</div>

@@ -117,7 +117,7 @@
             </div>
             <div class="table-wrap">
                 <table class="t">
-                    <thead><tr><th>Code</th><th>Ext Code</th><th>Branch</th><th>Province</th><th>District</th><th>Local Level</th><th>Address</th><th class="text-right">Actions</th></tr></thead>
+                    <thead><tr><th>Code</th><th>Ext Code</th><th>Branch</th><th>Province</th><th>District</th><th>Period</th><th>Status</th><th>Inactive Period</th><th class="text-right">Actions</th></tr></thead>
                     <tbody>
                         @forelse ($branches as $branch)
                             <tr>
@@ -126,11 +126,12 @@
                                 <td>{{ $branch->branch_name }}</td>
                                 <td>{{ $branch->province->province_name }}</td>
                                 <td>{{ $branch->district->district_name }}</td>
-                                <td>{{ $branch->local_level }}</td>
-                                <td>{{ $branch->address }}</td>
+                                <td>{{ $branch->fiscal_year ?? '-' }} {{ $monthNames[$branch->month] ?? '' }}</td>
+                                <td><span class="badge {{ $branch->status === 'active' ? 'success' : 'danger' }}">{{ ucfirst($branch->status) }}</span></td>
+                                <td>{{ $branch->inactive_fiscal_year ? $branch->inactive_fiscal_year.' '.($monthNames[$branch->inactive_month] ?? '') : '-' }}</td>
                                 <td class="text-right">
                                     <button type="button" class="btn btn-ghost btn-sm"
-                                        @click='openBranch({{ $branch->id }}, {{ (int) $branch->branch_code }}, {{ json_encode($branch->ext_branch_code) }}, {{ json_encode($branch->branch_name) }}, {{ (int) $branch->province_id }}, {{ (int) $branch->district_id }}, {{ (int) ($branch->local_level ?? 0) }}, {{ json_encode($branch->address ?? '') }}, {{ json_encode($branch->display_name ?? '') }}, {{ json_encode($branch->status) }})'>Edit</button>
+                                        @click='openBranch({{ $branch->id }}, {{ (int) $branch->branch_code }}, {{ json_encode($branch->ext_branch_code) }}, {{ json_encode($branch->branch_name) }}, {{ (int) $branch->province_id }}, {{ (int) $branch->district_id }}, {{ json_encode($branch->fiscal_year ?? '') }}, {{ (int) ($branch->month ?? 0) }}, {{ (int) ($branch->local_level ?? 0) }}, {{ json_encode($branch->address ?? '') }}, {{ json_encode($branch->display_name ?? '') }}, {{ json_encode($branch->status) }}, {{ json_encode($branch->inactive_fiscal_year ?? '') }}, {{ (int) ($branch->inactive_month ?? 0) }})'>Edit</button>
                                     <form action="{{ route('branches.destroy', $branch->id) }}" method="POST" style="display:inline" onsubmit="return confirm('Delete this branch?')">
                                         @csrf
                                         @method('DELETE')
@@ -140,7 +141,7 @@
                                 </td>
                             </tr>
                         @empty
-                            <tr><td colspan="8" class="text-muted">No branches found.</td></tr>
+                            <tr><td colspan="9" class="text-muted">No branches found.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -339,6 +340,24 @@
                                     @endforeach
                                 </select>
                             </div>
+                            <div class="field mb-4">
+                                <label for="branch_fiscal_year">Fiscal Year</label>
+                                <select class="input" id="branch_fiscal_year" name="fiscal_year" x-model="branchForm.fiscalYear" required>
+                                    <option value="">Select Fiscal Year</option>
+                                    @foreach ($fiscalYears as $fiscalYear)
+                                        <option value="{{ $fiscalYear }}">{{ $fiscalYear }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="field mb-4">
+                                <label for="branch_month">Month</label>
+                                <select class="input" id="branch_month" name="month" x-model="branchForm.month" required>
+                                    <option value="">Select Month</option>
+                                    @foreach ($monthNames as $monthValue => $monthName)
+                                        <option value="{{ $monthValue }}">{{ $monthName }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
                             <div class="field mb-4"><label for="local_level">Local Level</label><input class="input" id="local_level" type="number" name="local_level" x-model.number="branchForm.localLevel" min="1"></div>
                             <div class="field mb-4"><label for="branch_address">Address</label><input class="input" id="branch_address" type="text" name="address" x-model="branchForm.address"></div>
                             <div class="field mb-4">
@@ -348,6 +367,28 @@
                                     <option value="inactive">Inactive</option>
                                 </select>
                             </div>
+                            <template x-if="branchForm.status === 'inactive'">
+                                <div class="field mb-4">
+                                    <label for="branch_inactive_fiscal_year">Inactive Fiscal Year</label>
+                                    <select class="input" id="branch_inactive_fiscal_year" name="inactive_fiscal_year" x-model="branchForm.inactiveFiscalYear" :required="branchForm.status === 'inactive'">
+                                        <option value="">Select Fiscal Year</option>
+                                        @foreach ($fiscalYears as $fiscalYear)
+                                            <option value="{{ $fiscalYear }}">{{ $fiscalYear }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </template>
+                            <template x-if="branchForm.status === 'inactive'">
+                                <div class="field mb-4">
+                                    <label for="branch_inactive_month">Inactive Month</label>
+                                    <select class="input" id="branch_inactive_month" name="inactive_month" x-model="branchForm.inactiveMonth" :required="branchForm.status === 'inactive'">
+                                        <option value="">Select Month</option>
+                                        @foreach ($monthNames as $monthValue => $monthName)
+                                            <option value="{{ $monthValue }}">{{ $monthName }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                            </template>
                         </div>
                     </div>
                     <div class="modal-foot">
@@ -367,7 +408,7 @@
                 provinceForm: { mode: 'create', action: '', name: '', code: '' },
                 districtForm: { mode: 'create', action: '', provinceId: '', name: '', code: '' },
                 policyForm: { mode: 'create', action: '', policyId: null, parentId: '', name: '', nameNp: '', code: '', status: 'active' },
-                branchForm: { mode: 'create', action: '', branchCode: null, extBranchCode: '', branchName: '', provinceId: '', districtId: '', localLevel: null, address: '', displayName: '', status: 'active' },
+                branchForm: { mode: 'create', action: '', branchCode: null, extBranchCode: '', branchName: '', provinceId: '', districtId: '', fiscalYear: '', month: '', localLevel: null, address: '', displayName: '', status: 'active', inactiveFiscalYear: '', inactiveMonth: '' },
 
                 addProvince() {
                     this.closeAll();
@@ -391,7 +432,7 @@
 
                 addBranch() {
                     this.closeAll();
-                    this.branchForm = { mode: 'create', action: '{{ route('branches.store') }}', branchCode: null, extBranchCode: '', branchName: '', provinceId: '', districtId: '', localLevel: null, address: '', displayName: '', status: 'active' };
+                    this.branchForm = { mode: 'create', action: '{{ route('branches.store') }}', branchCode: null, extBranchCode: '', branchName: '', provinceId: '', districtId: '', fiscalYear: '', month: '', localLevel: null, address: '', displayName: '', status: 'active', inactiveFiscalYear: '', inactiveMonth: '' };
                     this.modals.branch = true;
                 },
 
@@ -441,9 +482,9 @@
                 },
 
 
-                openBranch(id, branchCode, extBranchCode, branchName, provinceId, districtId, localLevel, address, displayName, status) {
+                openBranch(id, branchCode, extBranchCode, branchName, provinceId, districtId, fiscalYear, month, localLevel, address, displayName, status, inactiveFiscalYear, inactiveMonth) {
                     this.closeAll();
-                    this.branchForm = { mode: 'edit', action: '{{ route('branches.update', '__ID__') }}'.replace('__ID__', id), branchCode, extBranchCode, branchName, provinceId: String(provinceId), districtId: String(districtId), localLevel: localLevel || null, address, displayName, status };
+                    this.branchForm = { mode: 'edit', action: '{{ route('branches.update', '__ID__') }}'.replace('__ID__', id), branchCode, extBranchCode, branchName, provinceId: String(provinceId), districtId: String(districtId), fiscalYear, month: month ? String(month) : '', localLevel: localLevel || null, address, displayName, status, inactiveFiscalYear, inactiveMonth: inactiveMonth ? String(inactiveMonth) : '' };
                     this.modals.branch = true;
                 },
 

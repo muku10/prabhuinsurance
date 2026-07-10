@@ -24,8 +24,9 @@
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Province</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">District</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Local Level</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Period</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Inactive Period</th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
@@ -37,8 +38,9 @@
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $branch->branch_name }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $branch->province->province_name }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $branch->district->district_name }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $branch->local_level }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $branch->address }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $branch->fiscal_year ?? '-' }} {{ $monthNames[$branch->month] ?? '' }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ ucfirst($branch->status) }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $branch->inactive_fiscal_year ? $branch->inactive_fiscal_year.' '.($monthNames[$branch->inactive_month] ?? '') : '-' }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right space-x-2">
                                             <a href="{{ route('branches.edit', $branch->id) }}" class="text-prabhu-red-600 hover:text-prabhu-red-900">Edit</a>
                                             <form action="{{ route('branches.destroy', $branch->id) }}" method="POST" class="inline" onsubmit="return confirm('Delete this record?')">
@@ -50,7 +52,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="8" class="px-6 py-12 text-center text-gray-500">No branches found.</td>
+                                        <td colspan="9" class="px-6 py-12 text-center text-gray-500">No branches found.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
