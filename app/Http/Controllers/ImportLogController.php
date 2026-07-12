@@ -32,6 +32,7 @@ class ImportLogController extends Controller
         'paid_claim' => 'paid_claim_file',
         'withdrawal_claim' => 'withdrawal_claim_file',
         'intimation_claim' => 'intimation_claim_file',
+        'complain' => 'complain_file',
     ];
 
     public function index(Request $request): View
@@ -58,8 +59,8 @@ class ImportLogController extends Controller
         $selectedFiscalYear = $request->string('fiscal_year')->toString();
         $selectedMonth = $request->integer('month') ?: null;
 
-        $importHistory = ImportLog::with(['user', 'premiums', 'intimationClaims', 'paidClaims', 'withdrawalClaims', 'outstandingClaims'])
-            ->withCount(['premiums', 'intimationClaims', 'paidClaims', 'withdrawalClaims', 'outstandingClaims'])
+        $importHistory = ImportLog::with(['user', 'premiums', 'intimationClaims', 'paidClaims', 'withdrawalClaims', 'outstandingClaims', 'complains'])
+            ->withCount(['premiums', 'intimationClaims', 'paidClaims', 'withdrawalClaims', 'outstandingClaims', 'complains'])
             ->where('status', 'completed')
             ->when($selectedFiscalYear !== '', fn ($query) => $query->where('fiscal_year', $selectedFiscalYear))
             ->when($selectedMonth, fn ($query) => $query->where('month', $selectedMonth))
@@ -119,6 +120,7 @@ class ImportLogController extends Controller
             'paid_claim_file' => ['nullable', 'file', 'mimes:xlsx,xls,csv,pdf', 'max:20480'],
             'withdrawal_claim_file' => ['nullable', 'file', 'mimes:xlsx,xls,csv,pdf', 'max:20480'],
             'intimation_claim_file' => ['nullable', 'file', 'mimes:xlsx,xls,csv,pdf', 'max:20480'],
+            'complain_file' => ['nullable', 'file', 'mimes:xlsx,xls,csv,pdf', 'max:20480'],
         ]);
 
         $createdImportLogs = [];
@@ -635,6 +637,7 @@ class ImportLogController extends Controller
             'paid_claim' => PaidClaim::where('import_log_id', $importLog->id)->delete(),
             'withdrawal_claim' => WithdrawalClaim::where('import_log_id', $importLog->id)->delete(),
             'outstanding_claim' => OutstandingClaim::where('import_log_id', $importLog->id)->delete(),
+            'complain' => Complain::where('import_log_id', $importLog->id)->delete(),
             default => 0,
         };
     }
@@ -652,11 +655,12 @@ class ImportLogController extends Controller
             'paid_claim' => [PaidClaim::class, $this->buildPaidClaimRowsFromUpload($spreadsheet, $importLog)],
             'withdrawal_claim' => [WithdrawalClaim::class, $this->buildWithdrawalClaimRowsFromUpload($spreadsheet, $importLog)],
             'outstanding_claim' => [OutstandingClaim::class, $this->buildOutstandingClaimRowsFromUpload($spreadsheet, $importLog)],
+            'complain' => [Complain::class, $this->buildComplainRowsFromUpload($spreadsheet, $importLog)],
             default => throw new \RuntimeException('Unsupported upload type: '.$uploadType),
         };
     }
 
-    private function buildComplainsFromUpload($spreadsheet, ImportLog $importLog, string $fiscalYear, int $selectedMonth): array
+    private function buildComplainRowsFromUpload($spreadsheet, ImportLog $importLog): array
     {
         $worksheet = $spreadsheet->getActiveSheet();
         $rows = $worksheet->toArray(null, true, true, false);
@@ -668,76 +672,63 @@ class ImportLogController extends Controller
         $headerIndex = $this->findComplainHeaderRowIndex($rows);
 
         if ($headerIndex === null) {
-            return [];
+            throw new \RuntimeException('The uploaded complain file is missing required headers.');
         }
 
         $headers = array_map(fn ($value) => $this->normalizeHeader((string) $value), $rows[$headerIndex]);
-        $complains = [];
+        $records = [];
         $timestamp = now();
 
         foreach (array_slice($rows, $headerIndex + 1) as $row) {
-            $mappedRow = [];
+            $mappedRow = $this->mapHeaderRow($headers, $row);
 
-            foreach ($headers as $index => $header) {
-                if ($header === '') {
-                    continue;
-                }
-
-                $mappedRow[$header] = $row[$index] ?? null;
+            if (! $this->hasAnyValue($mappedRow, ['complaintype', 'complainttype', 'receivednum', 'resolvednum', 'pendingnum', 'averageresolutiontime'])) {
+                continue;
             }
 
-            $complainType = $this->nullableString($mappedRow['complaint_type'] ?? $mappedRow['complain_type'] ?? $mappedRow['complaintype'] ?? null);
+            $complainType = $this->nullableString($mappedRow['complaintype'] ?? $mappedRow['complainttype'] ?? null);
 
             if ($complainType === null) {
                 continue;
             }
 
-            $receivedNum = $this->numericInteger($mappedRow['received_num'] ?? $mappedRow['receivednum'] ?? null);
-            $resolvedNum = $this->numericInteger($mappedRow['resolved_num'] ?? $mappedRow['resolvednum'] ?? null);
-            $pendingNum = $this->numericInteger($mappedRow['pending_num'] ?? $mappedRow['pendingnum'] ?? null);
+            $receivedNum = $this->numericInteger($mappedRow['receivednum'] ?? null);
+            $resolvedNum = $this->numericInteger($mappedRow['resolvednum'] ?? null);
+            $pendingNum = $this->numericInteger($mappedRow['pendingnum'] ?? null);
 
             if ($receivedNum === 0 && $resolvedNum === 0 && $pendingNum === 0) {
                 continue;
             }
 
-            $complains[] = [
+            $records[] = [
                 'import_log_id' => $importLog->id,
-                'year' => $this->nullableInteger($mappedRow['year'] ?? null) ?? (int) substr($fiscalYear, 0, 4),
-                'month' => $this->nullableInteger($mappedRow['month'] ?? null) ?? $selectedMonth,
+                'year' => $this->nullableInteger($mappedRow['year'] ?? null) ?? (int) substr($importLog->fiscal_year, 0, 4),
+                'month' => $this->nullableInteger($mappedRow['month'] ?? null) ?? (int) $importLog->month,
                 'complain_type' => $complainType,
                 'received_num' => $receivedNum,
                 'resolved_num' => $resolvedNum,
                 'pending_num' => $pendingNum,
-                'average_resolution_time' => $this->nullableDecimal($mappedRow['average_resolution_time'] ?? $mappedRow['averageresolutiontime'] ?? null),
+                'average_resolution_time' => $this->nullableDecimal($mappedRow['averageresolutiontime'] ?? $mappedRow['avgresolutiontime'] ?? $mappedRow['resolutiontime'] ?? null),
+                'status' => $this->nullableString($mappedRow['status'] ?? null) ?? 'active',
                 'created_at' => $timestamp,
                 'updated_at' => $timestamp,
             ];
         }
 
-        return $complains;
+        return $records;
     }
 
     private function findComplainHeaderRowIndex(array $rows): ?int
     {
-        $requiredHeaders = [
-            'complaintype',
-            'receivednum',
-            'resolvednum',
-            'pendingnum',
-        ];
-
-        // Also accept alternate header names
-        $alternateHeaders = [
-            'complaint_type',
-            'received_num',
-            'resolved_num',
-            'pending_num',
-        ];
+        $requiredHeaders = ['receivednum', 'resolvednum', 'pendingnum'];
 
         foreach ($rows as $index => $row) {
             $normalizedRow = array_map(fn ($value) => $this->normalizeHeader((string) $value), $row);
 
-            if (empty(array_diff($requiredHeaders, $normalizedRow)) || empty(array_diff($alternateHeaders, $normalizedRow))) {
+            $hasComplainType = in_array('complaintype', $normalizedRow, true)
+                || in_array('complainttype', $normalizedRow, true);
+
+            if ($hasComplainType && empty(array_diff($requiredHeaders, $normalizedRow))) {
                 return $index;
             }
         }

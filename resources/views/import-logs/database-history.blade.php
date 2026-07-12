@@ -64,6 +64,7 @@
                                     'paid_claim' => $history->paid_claims_count,
                                     'withdrawal_claim' => $history->withdrawal_claims_count,
                                     'outstanding_claim' => $history->outstanding_claims_count,
+                                    'complain' => $history->complains_count,
                                     default => $history->premiums_count,
                                 };
                                 $typeLabel = ucfirst(str_replace('_', ' ', $history->upload_type ?? 'premium'));

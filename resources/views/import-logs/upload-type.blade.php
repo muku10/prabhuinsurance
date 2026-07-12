@@ -12,6 +12,7 @@
             'paid_claim' => 'Paid Claim',
             'withdrawal_claim' => 'Withdrawal Claim',
             'intimation_claim' => 'Intimation Claim',
+            'complain' => 'Complain',
         ];
     @endphp
 

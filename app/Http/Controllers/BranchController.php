@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Branch;
 use App\Models\District;
 use App\Models\Province;
+use App\Support\NepaliFiscalCalendar;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -17,7 +18,7 @@ class BranchController extends Controller
         $branches = Branch::with(['province', 'district'])
             ->orderBy('branch_code')
             ->get();
-        [, $monthNames] = $this->periodOptions();
+        $monthNames = NepaliFiscalCalendar::monthNames();
 
         return view('branches.index', compact('branches', 'monthNames'));
     }
@@ -33,24 +34,7 @@ class BranchController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
-            'branch_code' => ['required', 'integer', 'min:1', 'unique:branch_network,branch_code'],
-            'ext_branch_code' => ['required', 'string', 'max:10', 'unique:branch_network,ext_branch_code'],
-            'branch_name' => ['required', 'string', 'max:255'],
-            'province_id' => ['required', 'exists:provinces,province_id'],
-            'district_id' => ['required', 'exists:districts,district_id'],
-            'fiscal_year' => ['required', 'string', 'max:255'],
-            'month' => ['required', 'integer', 'min:1', 'max:12'],
-            'local_level' => ['nullable', 'integer', 'min:1'],
-            'address' => ['nullable', 'string', 'max:255'],
-            'display_name' => ['nullable', 'string', 'max:255'],
-            'status' => ['required', 'in:active,inactive'],
-            'inactive_fiscal_year' => ['nullable', 'required_if:status,inactive', 'string', 'max:255'],
-            'inactive_month' => ['nullable', 'required_if:status,inactive', 'integer', 'min:1', 'max:12'],
-        ]);
-
-        $validated['display_name'] = ($validated['display_name'] ?? '') ?: $validated['branch_name'];
-        $this->clearInactivePeriodWhenActive($validated);
+        $validated = $this->validatedBranchData($request);
 
         Branch::create($validated);
 
@@ -71,24 +55,7 @@ class BranchController extends Controller
 
     public function update(Request $request, Branch $branch): RedirectResponse
     {
-        $validated = $request->validate([
-            'branch_code' => ['required', 'integer', 'min:1', Rule::unique('branch_network', 'branch_code')->ignore($branch->id)],
-            'ext_branch_code' => ['required', 'string', 'max:10', Rule::unique('branch_network', 'ext_branch_code')->ignore($branch->id)],
-            'branch_name' => ['required', 'string', 'max:255'],
-            'province_id' => ['required', 'exists:provinces,province_id'],
-            'district_id' => ['required', 'exists:districts,district_id'],
-            'fiscal_year' => ['required', 'string', 'max:255'],
-            'month' => ['required', 'integer', 'min:1', 'max:12'],
-            'local_level' => ['nullable', 'integer', 'min:1'],
-            'address' => ['nullable', 'string', 'max:255'],
-            'display_name' => ['nullable', 'string', 'max:255'],
-            'status' => ['required', 'in:active,inactive'],
-            'inactive_fiscal_year' => ['nullable', 'required_if:status,inactive', 'string', 'max:255'],
-            'inactive_month' => ['nullable', 'required_if:status,inactive', 'integer', 'min:1', 'max:12'],
-        ]);
-
-        $validated['display_name'] = ($validated['display_name'] ?? '') ?: $validated['branch_name'];
-        $this->clearInactivePeriodWhenActive($validated);
+        $validated = $this->validatedBranchData($request, $branch);
 
         $branch->update($validated);
 
@@ -108,34 +75,54 @@ class BranchController extends Controller
         ]);
     }
 
-    private function periodOptions(): array
+    private function validatedBranchData(Request $request, ?Branch $branch = null): array
     {
-        $monthNames = [
-            1 => 'Baisakh',
-            2 => 'Jestha',
-            3 => 'Asar',
-            4 => 'Shrawan',
-            5 => 'Bhadra',
-            6 => 'Ashwin',
-            7 => 'Kartik',
-            8 => 'Mangsir',
-            9 => 'Poush',
-            10 => 'Magh',
-            11 => 'Falgun',
-            12 => 'Chaitra',
-        ];
+        $branchCodeRule = Rule::unique('branch_network', 'branch_code');
+        $extBranchCodeRule = Rule::unique('branch_network', 'ext_branch_code');
 
-        $fiscalYears = \App\Models\ImportLog::query()
-            ->whereNotNull('fiscal_year')
-            ->distinct()
-            ->orderByDesc('fiscal_year')
-            ->pluck('fiscal_year');
-
-        if ($fiscalYears->isEmpty()) {
-            $fiscalYears = collect(['2082-83', '2081-82', '2080-81', '2079-80', '2078-79']);
+        if ($branch) {
+            $branchCodeRule->ignore($branch->id);
+            $extBranchCodeRule->ignore($branch->id);
         }
 
-        return [$fiscalYears, $monthNames];
+        $validated = $request->validate([
+            'branch_code' => [
+                'required',
+                'integer',
+                'min:1',
+                $branchCodeRule,
+            ],
+            'ext_branch_code' => [
+                'required',
+                'string',
+                'max:10',
+                $extBranchCodeRule,
+            ],
+            'branch_name' => ['required', 'string', 'max:255'],
+            'province_id' => ['required', 'exists:provinces,province_id'],
+            'district_id' => ['required', 'exists:districts,district_id'],
+            'fiscal_year' => ['required', 'string', 'max:255'],
+            'month' => ['required', 'integer', 'min:1', 'max:12'],
+            'local_level' => ['nullable', 'integer', 'min:1'],
+            'address' => ['nullable', 'string', 'max:255'],
+            'display_name' => ['nullable', 'string', 'max:255'],
+            'status' => ['required', 'in:active,inactive'],
+            'inactive_fiscal_year' => ['nullable', 'required_if:status,inactive', 'string', 'max:255'],
+            'inactive_month' => ['nullable', 'required_if:status,inactive', 'integer', 'min:1', 'max:12'],
+        ]);
+
+        $validated['display_name'] = ($validated['display_name'] ?? '') ?: $validated['branch_name'];
+        $this->clearInactivePeriodWhenActive($validated);
+
+        return $validated;
+    }
+
+    private function periodOptions(): array
+    {
+        return [
+            NepaliFiscalCalendar::fiscalYearOptions(),
+            NepaliFiscalCalendar::monthNames(),
+        ];
     }
 
     private function clearInactivePeriodWhenActive(array &$validated): void

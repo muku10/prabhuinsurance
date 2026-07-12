@@ -9,6 +9,7 @@
             ['key' => 'paid_claim', 'title' => 'Paid Claim', 'description' => 'Attach the paid claim file separately.'],
             ['key' => 'withdrawal_claim', 'title' => 'Withdrawal Claim', 'description' => 'Attach the withdrawal claim file separately.'],
             ['key' => 'intimation_claim', 'title' => 'Intimation Claim', 'description' => 'Attach the intimation claim file separately.'],
+            ['key' => 'complain', 'title' => 'Complain', 'description' => 'Attach the complain file separately.'],
         ];
 
         $uploadTypeLabels = [
@@ -17,6 +18,7 @@
             'paid_claim' => 'Paid Claim',
             'withdrawal_claim' => 'Withdrawal Claim',
             'intimation_claim' => 'Intimation Claim',
+            'complain' => 'Complain',
         ];
     @endphp
 
@@ -33,7 +35,7 @@
                 </div>
                 <div class="kpi" style="min-width:160px;">
                     <div class="label">Upload slots</div>
-                    <div class="value">5</div>
+                    <div class="value">{{ count($uploadCategories) }}</div>
                     <div class="text-muted" style="font-size:12px; margin-top:4px;">Backend enabled</div>
                 </div>
             </div>
