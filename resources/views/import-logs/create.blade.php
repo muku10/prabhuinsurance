@@ -9,7 +9,7 @@
             ['key' => 'paid_claim', 'title' => 'Paid Claim', 'description' => 'Attach the paid claim file separately.'],
             ['key' => 'withdrawal_claim', 'title' => 'Withdrawal Claim', 'description' => 'Attach the withdrawal claim file separately.'],
             ['key' => 'intimation_claim', 'title' => 'Intimation Claim', 'description' => 'Attach the intimation claim file separately.'],
-            ['key' => 'complain', 'title' => 'Complain', 'description' => 'Attach the complain file separately.'],
+            ['key' => 'complain', 'title' => 'Grievance', 'description' => 'Attach the grievance file separately.'],
         ];
 
         $uploadTypeLabels = [
@@ -18,7 +18,7 @@
             'paid_claim' => 'Paid Claim',
             'withdrawal_claim' => 'Withdrawal Claim',
             'intimation_claim' => 'Intimation Claim',
-            'complain' => 'Complain',
+            'complain' => 'Grievance',
         ];
     @endphp
 
@@ -103,11 +103,29 @@
                                                 <div style="font-size:17px; font-weight:800; color:var(--ink);">{{ $category['title'] }}</div>
                                                 <div class="text-muted" style="font-size:13px; margin-top:4px; line-height:1.6;">{{ $category['description'] }}</div>
                                             </div>
-                                            <span class="badge info" data-upload-badge>Pending</span>
+                                            <div class="flex gap-2 center">
+                                                @if ($category['key'] === 'complain')
+                                                    <a href="{{ route('grievances.template') }}" class="btn btn-outline btn-sm" onclick="event.stopPropagation()">Download Template</a>
+                                                @endif
+                                                <span class="badge info" data-upload-badge>Pending</span>
+                                            </div>
                                         </div>
 
+                                        @if ($category['key'] === 'complain')
+                                            <div style="border:1px solid var(--line); border-radius:10px; background:#F8FAFC; padding:12px 14px;">
+                                                <div style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:var(--brand); margin-bottom:8px;">Required template headings</div>
+                                                <div class="flex" style="flex-wrap:wrap; gap:7px;">
+                                                    @foreach (['Grievance Type ID', 'Received Num', 'Resolved Num', 'Average Resolution Time (Days)'] as $heading)
+                                                        <span class="badge info">{{ $heading }}</span>
+                                                    @endforeach
+                                                </div>
+                                                <div class="text-muted" style="font-size:11.5px; margin-top:9px; line-height:1.5;">Enter the overall average resolution time once in the first data row. Pending and the overall resolution rate are calculated automatically.</div>
+                                            </div>
+                                        @endif
+
                                         @php
-                                            $acceptTypes = $category['key'] === 'premium' ? '.xlsx,.xls,.csv' : '.xlsx,.xls,.csv,.pdf';
+                                            $excelOnly = in_array($category['key'], ['premium', 'complain'], true);
+                                            $acceptTypes = $excelOnly ? '.xlsx,.xls,.csv' : '.xlsx,.xls,.csv,.pdf';
                                         @endphp
                                         <label class="dropzone" data-dropzone data-target="{{ $category['key'] }}" style="min-height:150px; border-style:dashed; background:#fafafa;">
                                             <input type="file" name="{{ $category['key'] }}_file" id="{{ $category['key'] }}_file" data-upload-input data-target="{{ $category['key'] }}" accept="{{ $acceptTypes }}" hidden>
@@ -119,7 +137,7 @@
                                                 </svg>
                                             </div>
                                             <h3 id="{{ $category['key'] }}_title" style="margin:0;">Drop {{ $category['title'] }} file here</h3>
-                                            <p id="{{ $category['key'] }}_text" style="margin:0;">or click to browse - Accepted: {{ $category['key'] === 'premium' ? '.xlsx, .xls, .csv' : '.xlsx, .xls, .csv, .pdf' }}</p>
+                                            <p id="{{ $category['key'] }}_text" style="margin:0;">or click to browse - Accepted: {{ $excelOnly ? '.xlsx, .xls, .csv' : '.xlsx, .xls, .csv, .pdf' }}</p>
                                         </label>
 
                                         <div class="flex between center" style="gap:12px;">

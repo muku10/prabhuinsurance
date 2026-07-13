@@ -67,7 +67,9 @@
                                     'complain' => $history->complains_count,
                                     default => $history->premiums_count,
                                 };
-                                $typeLabel = ucfirst(str_replace('_', ' ', $history->upload_type ?? 'premium'));
+                                $typeLabel = ($history->upload_type ?? 'premium') === 'complain'
+                                    ? 'Grievance'
+                                    : ucfirst(str_replace('_', ' ', $history->upload_type ?? 'premium'));
                             @endphp
                             <tr>
                                 <td>{{ $loop->iteration }}</td>

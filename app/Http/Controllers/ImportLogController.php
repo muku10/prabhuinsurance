@@ -6,6 +6,7 @@ use App\Models\Branch;
 use App\Models\Complain;
 use App\Models\District;
 use App\Models\ImportLog;
+use App\Models\GrievanceType;
 use App\Models\IntimationClaim;
 use App\Models\OutstandingClaim;
 use App\Models\PaidClaim;
@@ -120,7 +121,7 @@ class ImportLogController extends Controller
             'paid_claim_file' => ['nullable', 'file', 'mimes:xlsx,xls,csv,pdf', 'max:20480'],
             'withdrawal_claim_file' => ['nullable', 'file', 'mimes:xlsx,xls,csv,pdf', 'max:20480'],
             'intimation_claim_file' => ['nullable', 'file', 'mimes:xlsx,xls,csv,pdf', 'max:20480'],
-            'complain_file' => ['nullable', 'file', 'mimes:xlsx,xls,csv,pdf', 'max:20480'],
+            'complain_file' => ['nullable', 'file', 'mimes:xlsx,xls,csv', 'max:20480'],
         ]);
 
         $createdImportLogs = [];
@@ -672,29 +673,44 @@ class ImportLogController extends Controller
         $headerIndex = $this->findComplainHeaderRowIndex($rows);
 
         if ($headerIndex === null) {
-            throw new \RuntimeException('The uploaded complain file is missing required headers.');
+            throw new \RuntimeException('The uploaded grievance file is missing required headers.');
         }
 
         $headers = array_map(fn ($value) => $this->normalizeHeader((string) $value), $rows[$headerIndex]);
         $records = [];
+        $overallAverageResolutionTime = null;
         $timestamp = now();
+        $validGrievanceTypeIds = GrievanceType::pluck('id')->map(fn ($id) => (string) $id)->flip();
 
         foreach (array_slice($rows, $headerIndex + 1) as $row) {
             $mappedRow = $this->mapHeaderRow($headers, $row);
+            $rowAverageResolutionTime = $this->nullableDecimal(
+                $mappedRow['averageresolutiontimedays']
+                    ?? $mappedRow['averageresolutiontime']
+                    ?? $mappedRow['avgresolutiontime']
+                    ?? $mappedRow['resolutiontime']
+                    ?? null
+            );
+            $overallAverageResolutionTime ??= $rowAverageResolutionTime;
 
-            if (! $this->hasAnyValue($mappedRow, ['complaintype', 'complainttype', 'receivednum', 'resolvednum', 'pendingnum', 'averageresolutiontime'])) {
+            if (! $this->hasAnyValue($mappedRow, ['grievancetypeid', 'grievancetype', 'complaintype', 'complainttype', 'receivednum', 'resolvednum', 'averageresolutiontime'])) {
                 continue;
             }
 
-            $complainType = $this->nullableString($mappedRow['complaintype'] ?? $mappedRow['complainttype'] ?? null);
+            $complainType = $this->nullableString($mappedRow['grievancetypeid'] ?? $mappedRow['grievancetype'] ?? $mappedRow['complaintype'] ?? $mappedRow['complainttype'] ?? null);
 
             if ($complainType === null) {
                 continue;
             }
 
+            if (! isset($validGrievanceTypeIds[(string) $complainType])) {
+                throw new \RuntimeException("Grievance Type ID {$complainType} does not exist in Grievance Types master data.");
+            }
+
             $receivedNum = $this->numericInteger($mappedRow['receivednum'] ?? null);
             $resolvedNum = $this->numericInteger($mappedRow['resolvednum'] ?? null);
-            $pendingNum = $this->numericInteger($mappedRow['pendingnum'] ?? null);
+            $resolvedNum = min($receivedNum, $resolvedNum);
+            $pendingNum = $receivedNum - $resolvedNum;
 
             if ($receivedNum === 0 && $resolvedNum === 0 && $pendingNum === 0) {
                 continue;
@@ -704,31 +720,53 @@ class ImportLogController extends Controller
                 'import_log_id' => $importLog->id,
                 'year' => $this->nullableInteger($mappedRow['year'] ?? null) ?? (int) substr($importLog->fiscal_year, 0, 4),
                 'month' => $this->nullableInteger($mappedRow['month'] ?? null) ?? (int) $importLog->month,
-                'complain_type' => $complainType,
+                'grievance_type' => $complainType,
                 'received_num' => $receivedNum,
                 'resolved_num' => $resolvedNum,
                 'pending_num' => $pendingNum,
-                'average_resolution_time' => $this->nullableDecimal($mappedRow['averageresolutiontime'] ?? $mappedRow['avgresolutiontime'] ?? $mappedRow['resolutiontime'] ?? null),
+                'resolution_rate' => 0,
+                'average_resolution_time' => null,
                 'status' => $this->nullableString($mappedRow['status'] ?? null) ?? 'active',
                 'created_at' => $timestamp,
                 'updated_at' => $timestamp,
             ];
         }
 
+        if ($records !== [] && $overallAverageResolutionTime === null) {
+            throw new \RuntimeException('Overall Average Resolution Time (Days) is required in the grievance workbook.');
+        }
+
+        $totalReceived = array_sum(array_column($records, 'received_num'));
+        $totalResolved = array_sum(array_column($records, 'resolved_num'));
+        $overallResolutionRate = $totalReceived > 0
+            ? round(($totalResolved / $totalReceived) * 100, 2)
+            : 0;
+
+        foreach ($records as &$record) {
+            $record['resolution_rate'] = $overallResolutionRate;
+            $record['average_resolution_time'] = $overallAverageResolutionTime;
+        }
+        unset($record);
+
         return $records;
     }
 
     private function findComplainHeaderRowIndex(array $rows): ?int
     {
-        $requiredHeaders = ['receivednum', 'resolvednum', 'pendingnum'];
+        $requiredHeaders = ['receivednum', 'resolvednum'];
 
         foreach ($rows as $index => $row) {
             $normalizedRow = array_map(fn ($value) => $this->normalizeHeader((string) $value), $row);
 
-            $hasComplainType = in_array('complaintype', $normalizedRow, true)
+            $hasComplainType = in_array('grievancetypeid', $normalizedRow, true)
+                || in_array('grievancetype', $normalizedRow, true)
+                || in_array('complaintype', $normalizedRow, true)
                 || in_array('complainttype', $normalizedRow, true);
+            $hasAverageResolutionTime = in_array('averageresolutiontimedays', $normalizedRow, true)
+                || in_array('averageresolutiontime', $normalizedRow, true)
+                || in_array('avgresolutiontime', $normalizedRow, true);
 
-            if ($hasComplainType && empty(array_diff($requiredHeaders, $normalizedRow))) {
+            if ($hasComplainType && $hasAverageResolutionTime && empty(array_diff($requiredHeaders, $normalizedRow))) {
                 return $index;
             }
         }

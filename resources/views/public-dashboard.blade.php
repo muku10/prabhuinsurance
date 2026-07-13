@@ -93,11 +93,11 @@ tailwind.config = {
           </select>
         </label>
         <label class="flex flex-col gap-1">
-          <span class="text-[10px] font-semibold tracking-wide text-mute uppercase">Month</span>
+          <span class="text-[10px] font-semibold tracking-wide text-mute uppercase">Fiscal Month</span>
           <select id="monthSel" class="h-9 rounded-md border border-line bg-white px-2.5 text-sm font-medium shadow-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20">
             <option value="">All</option>
             @foreach ($months as $monthValue => $monthName)
-              <option value="{{ $monthValue }}" @selected($latestFinancialQuarter && $monthValue === [1 => 6, 2 => 9, 3 => 12, 4 => 3][$latestFinancialQuarter])>{{ $monthName }}</option>
+              <option value="{{ $monthValue }}">{{ $monthName }}</option>
             @endforeach
           </select>
         </label>
@@ -285,7 +285,7 @@ tailwind.config = {
     </section>
   </div>
 
-  <!-- Grievance + Complaint reasons -->
+  <!-- Grievance overview and reasons -->
   <div class="grid gap-6 lg:grid-cols-3">
     <section class="lg:col-span-2 overflow-hidden rounded-2xl border border-line bg-white card-shadow">
       <header class="flex items-center gap-2.5 border-b border-line bg-brand-soft px-5 py-3">
@@ -297,7 +297,7 @@ tailwind.config = {
     <section class="overflow-hidden rounded-2xl border border-line bg-white card-shadow">
       <header class="flex items-center gap-2.5 border-b border-line bg-brand-soft px-5 py-3">
         <span class="grid h-7 w-7 place-items-center rounded-md bg-brand text-white text-xs">✎</span>
-        <h2 class="text-sm font-semibold tracking-wide text-brand-deep uppercase">Complaint Reasons</h2>
+        <h2 class="text-sm font-semibold tracking-wide text-brand-deep uppercase">Grievance Reasons</h2>
       </header>
       <ul class="p-5 space-y-3" id="complaintList"></ul>
     </section>
@@ -338,6 +338,7 @@ const monthSelect = document.getElementById('monthSel');
 const provinceSelect = document.getElementById('provinceSel');
 const districtSelect = document.getElementById('districtSel');
 const financialHighlights = @json($financialHighlights);
+const grievanceReports = @json($grievanceReports);
 const latestFinancialFiscalYear = @json($latestFinancialFiscalYear);
 const latestFinancialQuarter = Number(@json($latestFinancialQuarter));
 function refreshDistricts(){
@@ -350,10 +351,10 @@ function refreshDistricts(){
 function resetFilters(){
   document.querySelectorAll('select').forEach(s => { s.selectedIndex = 0; });
   if (latestFinancialFiscalYear) fiscalYearSelect.value = latestFinancialFiscalYear;
-  if (latestFinancialQuarter) monthSelect.value = String({1:6, 2:9, 3:12, 4:3}[latestFinancialQuarter]);
   refreshDistricts();
   updateBranchNetwork();
   updateFinancialHighlights();
+  updateGrievances();
 }
 function applyFilters(){
   fiscalYearSelect.dispatchEvent(new Event('change'));
@@ -362,12 +363,15 @@ function applyFilters(){
   districtSelect.dispatchEvent(new Event('change'));
   updateBranchNetwork();
   updateFinancialHighlights();
+  updateGrievances();
 }
 provinceSelect.addEventListener('change', refreshDistricts);
 fiscalYearSelect.addEventListener('change', updateBranchNetwork);
 monthSelect.addEventListener('change', updateBranchNetwork);
 fiscalYearSelect.addEventListener('change', updateFinancialHighlights);
 monthSelect.addEventListener('change', updateFinancialHighlights);
+fiscalYearSelect.addEventListener('change', updateGrievances);
+monthSelect.addEventListener('change', updateGrievances);
 districtSelect.addEventListener('change', updateBranchNetwork);
 
 function renderTable(elId, firstCol, head, rows){
@@ -418,13 +422,58 @@ renderTable('portfolioTable','Portfolio',
 renderTable('outCountTable','Portfolio',["< 1 yr","1–3 yr","3–5 yr","5+ yr","Total"],@json($outstandingClaimCounts));
 renderTable('outAmtTable','Portfolio',["< 1 yr","1–3 yr","3–5 yr","5+ yr","Total"],@json($outstandingClaimAmounts));
 
-renderTable('grievanceTable','Metric',years,[
-  ["Complaints Received",42,51,48,55,60],
-  ["Complaints Resolved",39,47,43,49,54],
-  ["Complaints Pending",3,4,5,6,6],
-  ["Resolution Rate (%)","92.8%","92.1%","89.5%","89.0%","90.0%"],
-  ["Avg. Resolution Time (days)",12,14,16,18,21],
-]);
+function fiscalMonthOrder(month){
+  const order = {4:1,5:2,6:3,7:4,8:5,9:6,10:7,11:8,12:9,1:10,2:11,3:12};
+  return order[Number(month)] || 0;
+}
+
+function grievanceReportFor(fiscalYear, requestedMonth = null){
+  const reports = grievanceReports.filter(report => report.fiscal_year === fiscalYear);
+  if (requestedMonth) return reports.find(report => Number(report.month) === Number(requestedMonth));
+  return reports.sort((a, b) => fiscalMonthOrder(b.month) - fiscalMonthOrder(a.month))[0];
+}
+
+function updateGrievances(){
+  const selectedFiscalYear = fiscalYearSelect.value;
+  const selectedMonth = monthSelect.value ? Number(monthSelect.value) : null;
+  const fiscalYears = fiveFiscalYearsFrom(selectedFiscalYear);
+  const reports = fiscalYears.map(year => grievanceReportFor(year, selectedMonth));
+  const value = (report, key) => report ? Number(report[key] || 0) : null;
+  const pending = report => report ? Math.max(0, value(report, 'received') - value(report, 'resolved')) : null;
+  const rate = report => report && value(report, 'received') > 0
+    ? (value(report, 'resolved') / value(report, 'received')) * 100
+    : (report ? 0 : null);
+  const display = (number, suffix = '') => number === null || number === undefined
+    ? '-'
+    : `${new Intl.NumberFormat('en-IN', {maximumFractionDigits:2}).format(number)}${suffix}`;
+
+  renderTable('grievanceTable', 'Metric', fiscalYears, [
+    ['Grievances Received', ...reports.map(report => display(value(report, 'received')))],
+    ['Grievances Resolved', ...reports.map(report => display(value(report, 'resolved')))],
+    ['Grievances Pending', ...reports.map(report => display(pending(report)))],
+    ['Resolution Rate (%)', ...reports.map(report => display(rate(report), '%'))],
+    ['Avg. Resolution Time (days)', ...reports.map(report => display(report?.average_resolution_time === null || report?.average_resolution_time === undefined ? null : Number(report.average_resolution_time)))],
+  ]);
+
+  const currentReport = grievanceReportFor(selectedFiscalYear, selectedMonth);
+  const reasons = currentReport ? Object.entries(currentReport.reasons || {}) : [];
+  const totalReasons = reasons.reduce((total, [, count]) => total + Number(count || 0), 0);
+  const colors = ['var(--c1)','var(--c2)','var(--c3)','var(--c4)','var(--c5)','var(--c6)'];
+  const escapeHtml = value => String(value).replace(/[&<>'"]/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[character]));
+  document.getElementById('complaintList').innerHTML = reasons.length
+    ? reasons.map(([reason, count], index) => {
+        const percentage = totalReasons > 0 ? (Number(count) / totalReasons) * 100 : 0;
+        return `<li>
+          <div class="flex items-baseline justify-between text-sm">
+            <span class="truncate">${escapeHtml(reason)}</span><span class="tabular-nums text-mute">${count} · ${percentage.toFixed(1)}%</span>
+          </div>
+          <div class="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary">
+            <div class="h-full rounded-full" style="width:${Math.min(percentage,100)}%;background:${colors[index % colors.length]}"></div>
+          </div>
+        </li>`;
+      }).join('')
+    : '<li class="rounded-xl border border-line/70 bg-brand-soft/40 p-3 text-sm text-mute">No grievance data for this reporting period.</li>';
+}
 
 function fiscalQuarterFromMonth(month){
   const value = Number(month);
@@ -620,21 +669,7 @@ function updateBranchNetwork(){
 
 updateBranchNetwork();
 
-// complaints
-const complaints = [
-  ["Claim delays",10,20],["Policy disputes",5,10],["Premium billing",12,24],
-  ["Service quality",8,16],["Documentation",14,27],["Other",2,4]
-];
-const cc = ['var(--c1)','var(--c2)','var(--c3)','var(--c4)','var(--c5)','var(--c6)'];
-document.getElementById('complaintList').innerHTML = complaints.map(([r,c,s],i)=>`
-  <li>
-    <div class="flex items-baseline justify-between text-sm">
-      <span class="truncate">${r}</span><span class="tabular-nums text-mute">${c} · ${s}%</span>
-    </div>
-    <div class="mt-1 h-1.5 overflow-hidden rounded-full bg-secondary">
-      <div class="h-full rounded-full" style="width:${Math.min(s*3,100)}%;background:${cc[i]}"></div>
-    </div>
-  </li>`).join('');
+updateGrievances();
 
 // Charts
 const palette = ['#b3261e','#e0733a','#e0a458','#3d7fa8','#7d5aa8','#7a1a15'];

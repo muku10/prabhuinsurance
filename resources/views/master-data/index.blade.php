@@ -8,7 +8,7 @@
             <a href="#" data-tab="dist">Districts</a>
             <a href="#" data-tab="pt">Policy Types</a>
             <a href="#" data-tab="br">Branches</a>
-            <a href="#" data-tab="ct">Complain Types</a>
+            <a href="#" data-tab="ct">Grievance Types</a>
             <a href="#" data-tab="conf">Configuration</a>
         </nav>
 
@@ -151,7 +151,7 @@
         {{-- ===================== COMPLAIN TYPES ===================== --}}
         <div data-tab-panel="ct" class="hide">
             <div class="flex between center mb-3">
-                <h2 style="margin:0; font-size:16px;">Complain Types ({{ $complainTypes->count() }})</h2>
+                <h2 style="margin:0; font-size:16px;">Grievance Types ({{ $complainTypes->count() }})</h2>
             </div>
             <div class="table-wrap">
                 <table class="t">
@@ -163,7 +163,7 @@
                                 <td>{{ $complainType->name }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="2" class="text-muted">No complain types found.</td></tr>
+                            <tr><td colspan="2" class="text-muted">No grievance types found.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

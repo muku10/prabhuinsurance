@@ -2,10 +2,10 @@
     <x-slot name="header">
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-                {{ __('Complains') }} ({{ $complains->count() }})
+                {{ __('Grievances') }} ({{ $grievances->count() }})
             </h2>
-            <a href="{{ route('complains.create') }}" class="inline-flex items-center px-4 py-2 bg-prabhu-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-prabhu-red-700 focus:bg-prabhu-red-700 active:bg-prabhu-red-800 focus:outline-none focus:ring-2 focus:ring-prabhu-red-500 focus:ring-offset-2 transition ease-in-out duration-150">
-                + Add Complain
+            <a href="{{ route('grievances.create') }}" class="inline-flex items-center px-4 py-2 bg-prabhu-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-prabhu-red-700 focus:bg-prabhu-red-700 active:bg-prabhu-red-800 focus:outline-none focus:ring-2 focus:ring-prabhu-red-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                + Add Grievance
             </a>
         </div>
     </x-slot>
@@ -24,22 +24,24 @@
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Received</th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Resolved</th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Pending</th>
+                                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Resolution Rate</th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Resolution (Days)</th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
-                                @forelse ($complains as $complain)
+                                @forelse ($grievances as $complain)
                                     <tr class="hover:bg-gray-50">
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $loop->iteration }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $complain->complain_type }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $complain->grievanceType?->name ?? $complain->grievance_type }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{{ $complain->received_num }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{{ $complain->resolved_num }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{{ $complain->pending_num }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{{ number_format((float) $complain->resolution_rate, 2) }}%</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">{{ $complain->average_resolution_time ?? '-' }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-right space-x-2">
-                                            <a href="{{ route('complains.edit', $complain->id) }}" class="text-prabhu-red-600 hover:text-prabhu-red-900">Edit</a>
-                                            <form action="{{ route('complains.destroy', $complain->id) }}" method="POST" class="inline" onsubmit="return confirm('Delete this complain?')">
+                                            <a href="{{ route('grievances.edit', $complain->id) }}" class="text-prabhu-red-600 hover:text-prabhu-red-900">Edit</a>
+                                            <form action="{{ route('grievances.destroy', $complain->id) }}" method="POST" class="inline" onsubmit="return confirm('Delete this grievance?')">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="text-red-600 hover:text-red-900">Delete</button>
@@ -48,7 +50,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="7" class="px-6 py-12 text-center text-gray-500">No complains found.</td>
+                                        <td colspan="8" class="px-6 py-12 text-center text-gray-500">No grievances found.</td>
                                     </tr>
                                 @endforelse
                             </tbody>

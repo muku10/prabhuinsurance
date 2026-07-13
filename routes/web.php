@@ -47,7 +47,10 @@ Route::middleware('auth')->group(function () {
     Route::resource('districts', DistrictController::class)->except(['show']);
     Route::resource('policies', PolicyController::class)->except(['show']);
     Route::resource('branches', BranchController::class)->except(['show']);
-    Route::resource('complains', ComplainController::class)->except(['show']);
+    Route::get('/grievances/template/download', [ComplainController::class, 'template'])->name('grievances.template');
+    Route::resource('grievances', ComplainController::class)
+        ->parameters(['grievances' => 'complain'])
+        ->except(['show']);
     Route::resource('import-logs', ImportLogController::class)->except(['show', 'create', 'store']);
 });
 

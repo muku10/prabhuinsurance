@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Branch;
+use App\Models\Complain;
 use App\Models\FinancialHighlightImport;
 use App\Models\OutstandingClaim;
 use App\Models\Policy;
@@ -59,10 +60,47 @@ class PublicDashboardData
             ->unique()
             ->sortDesc()
             ->values();
+        $grievanceReports = Complain::with(['importLog', 'grievanceType'])
+            ->get()
+            ->groupBy(function (Complain $grievance) {
+                $fiscalYear = $grievance->importLog?->fiscal_year
+                    ?? $grievance->year.'-'.substr((string) ($grievance->year + 1), -2);
+                $month = (int) ($grievance->importLog?->month ?? $grievance->month);
+
+                return $fiscalYear.'|'.$month;
+            })
+            ->map(function (Collection $rows, string $period) {
+                [$fiscalYear, $month] = explode('|', $period);
+                $received = (int) $rows->sum('received_num');
+                $resolved = min($received, (int) $rows->sum('resolved_num'));
+                $averageResolutionTime = $rows->pluck('average_resolution_time')
+                    ->first(fn ($value) => $value !== null && $value !== '');
+
+                return [
+                    'fiscal_year' => $fiscalYear,
+                    'month' => (int) $month,
+                    'received' => $received,
+                    'resolved' => $resolved,
+                    'pending' => $received - $resolved,
+                    'resolution_rate' => $received > 0 ? round(($resolved / $received) * 100, 2) : 0,
+                    'average_resolution_time' => $averageResolutionTime !== null ? (float) $averageResolutionTime : null,
+                    'reasons' => $rows->groupBy(fn (Complain $row) => $row->grievanceType?->name ?? 'Unknown Grievance Type')
+                        ->map(fn (Collection $reasonRows) => (int) $reasonRows->sum('received_num'))
+                        ->sortDesc()
+                        ->all(),
+                ];
+            })
+            ->values();
+        $fiscalYears = $fiscalYears
+            ->merge($grievanceReports->pluck('fiscal_year'))
+            ->unique()
+            ->sortDesc()
+            ->values();
 
         return [
             'fiscalYears' => $fiscalYears,
-            'months' => NepaliFiscalCalendar::monthNames(),
+            // Public reporting follows the Nepal fiscal year: Shrawan first, Asar last.
+            'months' => NepaliFiscalCalendar::fiscalMonthNames(),
             'provinces' => $provinces,
             'districtsByProvince' => $provinces
                 ->mapWithKeys(fn ($province) => [
@@ -76,6 +114,7 @@ class PublicDashboardData
             'financialHighlights' => $financialHighlights,
             'latestFinancialFiscalYear' => $latestFinancialHighlightImport?->fiscal_year,
             'latestFinancialQuarter' => $latestFinancialHighlightImport?->quarter,
+            'grievanceReports' => $grievanceReports,
         ];
     }
 
