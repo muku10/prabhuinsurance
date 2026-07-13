@@ -65,7 +65,7 @@ tailwind.config = {
       <div class="min-w-0">
         <p class="text-xs font-medium tracking-[0.25em] text-white/70 uppercase">Public Disclosure</p>
         <h1 class="truncate text-xl font-semibold sm:text-2xl">Transparency Dashboard · Prabhu Insurance Limited</h1>
-        <p class="text-xs text-white/70">Fiscal Year 2082-83 (YTD) · Last updated <span id="today"></span></p>
+        <p class="text-xs text-white/70">Fiscal Year <span id="bannerFiscalYear">{{ $latestFinancialFiscalYear ?? $fiscalYears->first() }}</span> (YTD) · Last updated <span id="today"></span></p>
       </div>
     </div>
     <div class="flex flex-wrap items-center gap-2 text-xs">
@@ -88,7 +88,7 @@ tailwind.config = {
           <span class="text-[10px] font-semibold tracking-wide text-mute uppercase">Fiscal Year</span>
           <select id="fiscalYearSel" class="h-9 rounded-md border border-line bg-white px-2.5 text-sm font-medium shadow-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20">
             @foreach ($fiscalYears as $fiscalYear)
-              <option value="{{ $fiscalYear }}">{{ $fiscalYear }}</option>
+              <option value="{{ $fiscalYear }}" @selected($latestFinancialFiscalYear === $fiscalYear)>{{ $fiscalYear }}</option>
             @endforeach
           </select>
         </label>
@@ -97,7 +97,7 @@ tailwind.config = {
           <select id="monthSel" class="h-9 rounded-md border border-line bg-white px-2.5 text-sm font-medium shadow-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20">
             <option value="">All</option>
             @foreach ($months as $monthValue => $monthName)
-              <option value="{{ $monthValue }}">{{ $monthName }}</option>
+              <option value="{{ $monthValue }}" @selected($latestFinancialQuarter && $monthValue === [1 => 6, 2 => 9, 3 => 12, 4 => 3][$latestFinancialQuarter])>{{ $monthName }}</option>
             @endforeach
           </select>
         </label>
@@ -162,8 +162,8 @@ tailwind.config = {
         <span class="text-[10px] font-medium tracking-wide text-success uppercase">Healthy</span>
       </div>
       <p class="mt-4 text-[11px] font-medium tracking-wide text-mute uppercase">Solvency Ratio</p>
-      <p class="mt-1 text-2xl font-semibold tracking-tight tabular-nums">1.82x</p>
-      <p class="mt-0.5 text-xs text-mute">Regulatory ≥ 1.50x</p>
+      <p id="publicSolvencyValue" class="mt-1 text-2xl font-semibold tracking-tight tabular-nums">—</p>
+      <p id="publicSolvencyPeriod" class="mt-0.5 text-xs text-mute">Latest reported quarter</p>
     </div>
     <div class="relative overflow-hidden rounded-2xl border border-line bg-white p-5 card-shadow">
       <div class="flex items-start justify-between">
@@ -303,15 +303,20 @@ tailwind.config = {
     </section>
   </div>
 
-  <!-- Financial trend -->
+  <!-- Financial highlights -->
   <section class="overflow-hidden rounded-2xl border border-line bg-white card-shadow">
     <header class="flex items-center gap-2.5 border-b border-line bg-brand-soft px-5 py-3">
-      <span class="grid h-7 w-7 place-items-center rounded-md bg-brand text-white text-xs">↗</span>
-      <h2 class="text-sm font-semibold tracking-wide text-brand-deep uppercase">Financial Strength &amp; Solvency — 5-Year Trend</h2>
+      <div class="flex items-center gap-2.5">
+        <span class="grid h-7 w-7 place-items-center rounded-md bg-brand text-white text-xs">↗</span>
+        <h2 class="text-sm font-semibold tracking-wide text-brand-deep uppercase">Financial Highlights</h2>
+      </div>
     </header>
-    <div class="p-5 grid gap-6 lg:grid-cols-5">
-      <div class="lg:col-span-3 h-72 relative"><canvas id="finLine"></canvas></div>
-      <div class="lg:col-span-2 overflow-x-auto" id="finTable"></div>
+    <div class="p-5">
+      <div id="financialHighlightsTable" class="overflow-x-auto"></div>
+      <p class="mt-4 flex items-center gap-1.5 text-xs text-mute">
+        <svg class="h-3.5 w-3.5 text-brand" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5"/><path d="M12 8h.01"/></svg>
+        Financial highlights follow the fiscal year and month filters only; province and district filters do not apply.
+      </p>
     </div>
   </section>
 
@@ -332,6 +337,9 @@ const fiscalYearSelect = document.getElementById('fiscalYearSel');
 const monthSelect = document.getElementById('monthSel');
 const provinceSelect = document.getElementById('provinceSel');
 const districtSelect = document.getElementById('districtSel');
+const financialHighlights = @json($financialHighlights);
+const latestFinancialFiscalYear = @json($latestFinancialFiscalYear);
+const latestFinancialQuarter = Number(@json($latestFinancialQuarter));
 function refreshDistricts(){
   const province = provinceSelect.value;
   districtSelect.replaceChildren(new Option('All', ''));
@@ -341,8 +349,11 @@ function refreshDistricts(){
 }
 function resetFilters(){
   document.querySelectorAll('select').forEach(s => { s.selectedIndex = 0; });
+  if (latestFinancialFiscalYear) fiscalYearSelect.value = latestFinancialFiscalYear;
+  if (latestFinancialQuarter) monthSelect.value = String({1:6, 2:9, 3:12, 4:3}[latestFinancialQuarter]);
   refreshDistricts();
   updateBranchNetwork();
+  updateFinancialHighlights();
 }
 function applyFilters(){
   fiscalYearSelect.dispatchEvent(new Event('change'));
@@ -350,10 +361,13 @@ function applyFilters(){
   provinceSelect.dispatchEvent(new Event('change'));
   districtSelect.dispatchEvent(new Event('change'));
   updateBranchNetwork();
+  updateFinancialHighlights();
 }
 provinceSelect.addEventListener('change', refreshDistricts);
 fiscalYearSelect.addEventListener('change', updateBranchNetwork);
 monthSelect.addEventListener('change', updateBranchNetwork);
+fiscalYearSelect.addEventListener('change', updateFinancialHighlights);
+monthSelect.addEventListener('change', updateFinancialHighlights);
 districtSelect.addEventListener('change', updateBranchNetwork);
 
 function renderTable(elId, firstCol, head, rows){
@@ -412,22 +426,85 @@ renderTable('grievanceTable','Metric',years,[
   ["Avg. Resolution Time (days)",12,14,16,18,21],
 ]);
 
-const financial = [
-  { y:"78-79", solvency:1.42, roe:8.2, eps:9.1, nw:2.11, npm:11.4, liq:1.18, iy:6.4 },
-  { y:"79-80", solvency:1.51, roe:9.4, eps:10.6, nw:2.28, npm:12.1, liq:1.22, iy:6.8 },
-  { y:"80-81", solvency:1.63, roe:10.7, eps:12.0, nw:2.55, npm:12.9, liq:1.28, iy:7.1 },
-  { y:"81-82", solvency:1.74, roe:11.9, eps:13.4, nw:2.81, npm:13.5, liq:1.31, iy:7.4 },
-  { y:"82-83", solvency:1.82, roe:12.8, eps:14.6, nw:3.05, npm:14.1, liq:1.35, iy:7.8 },
-];
-renderTable('finTable','Metric',years,[
-  ["Solvency Ratio (x)",...financial.map(f=>f.solvency).reverse()],
-  ["Return on Equity (%)",...financial.map(f=>f.roe+'%').reverse()],
-  ["EPS (NPR)",...financial.map(f=>f.eps).reverse()],
-  ["Net Worth (NPR Cr)",...financial.map(f=>f.nw).reverse()],
-  ["Net Profit Margin (%)",...financial.map(f=>f.npm+'%').reverse()],
-  ["Liquidity Ratio",...financial.map(f=>f.liq).reverse()],
-  ["Investment Yield (%)",...financial.map(f=>f.iy+'%').reverse()],
-]);
+function fiscalQuarterFromMonth(month){
+  const value = Number(month);
+  if ([4,5,6].includes(value)) return 1; // Shrawan, Bhadra, Ashwin
+  if ([7,8,9].includes(value)) return 2; // Kartik, Mangsir, Poush
+  if ([10,11,12].includes(value)) return 3; // Magh, Falgun, Chaitra
+  if ([1,2,3].includes(value)) return 4; // Baisakh, Jestha, Asar
+  return null;
+}
+
+function financialValue(value, suffix = ''){
+  if (value === null || value === undefined || value === '') return '—';
+  return `${new Intl.NumberFormat('en-IN', {maximumFractionDigits: 4}).format(Number(value))}${suffix}`;
+}
+
+function updateFinancialHighlights(){
+  const fiscalYear = fiscalYearSelect.value;
+  const selectedQuarter = fiscalQuarterFromMonth(monthSelect.value) || latestFinancialQuarter || 1;
+  let row = financialHighlights.find(item => item.fiscal_year === fiscalYear && (!selectedQuarter || Number(item.quarter) === selectedQuarter));
+
+  if (!row) {
+    document.getElementById('publicSolvencyValue').textContent = '-';
+    document.getElementById('publicSolvencyPeriod').textContent = `FY ${fiscalYear} · Q${selectedQuarter}`;
+    document.getElementById('bannerFiscalYear').textContent = fiscalYear;
+  } else {
+    document.getElementById('publicSolvencyValue').textContent = financialValue(row.solvency_ratio, 'x');
+    document.getElementById('publicSolvencyPeriod').textContent = `FY ${row.fiscal_year} · Q${row.quarter}`;
+    document.getElementById('bannerFiscalYear').textContent = row.fiscal_year;
+  }
+
+  renderFinancialHighlightsTable(fiscalYear, selectedQuarter);
+}
+
+function fiveFiscalYearsFrom(fiscalYear){
+  const match = String(fiscalYear || '').match(/(\d{4})\D+(\d{2,4})/);
+  if (!match) return [fiscalYear];
+
+  const start = Number(match[1]);
+  return Array.from({length: 5}, (_, index) => {
+    const yearStart = start - index;
+    return `${yearStart}-${String(yearStart + 1).slice(-2)}`;
+  });
+}
+
+function renderFinancialHighlightsTable(selectedFiscalYear, quarter){
+  const years = fiveFiscalYearsFrom(selectedFiscalYear);
+  const records = new Map(
+    financialHighlights
+      .filter(item => Number(item.quarter) === Number(quarter))
+      .map(item => [item.fiscal_year, item])
+  );
+  const metrics = [
+    ['Solvency Ratio (x)', 'solvency_ratio', 'x'],
+    ['Return on Equity (%)', 'return_on_equity', '%'],
+    ['Earnings per Share (NPR)', 'earnings_per_share', ''],
+    ['Net Worth (NPR)', 'net_worth', ''],
+    ['Net Profit Margin (%)', 'net_profit_margin', '%'],
+    ['Liquidity Ratio', 'liquidity_ratio', ''],
+    ['Investment Yield (%)', 'investment_yield', '%'],
+  ];
+  const headings = years.map((year, index) => `
+    <th class="min-w-[120px] px-3 py-2.5 text-right text-sm font-medium ${index === 0 ? 'bg-brand-soft text-brand-deep' : ''}">${year}</th>`).join('');
+  const rows = metrics.map(([label, key, suffix]) => `
+    <tr class="border-b border-line/60 last:border-b-0 hover:bg-brand-soft/40">
+      <td class="sticky left-0 z-10 min-w-[230px] bg-white px-3 py-2.5 text-sm font-medium text-ink">${label}</td>
+      ${years.map((year, index) => {
+        const value = records.get(year)?.[key];
+        const display = value === null || value === undefined || value === '' ? '-' : financialValue(value, suffix);
+        return `<td class="px-3 py-2.5 text-right text-sm tabular-nums text-mute ${index === 0 ? 'bg-brand-soft/60 font-semibold text-brand-deep' : ''}">${display}</td>`;
+      }).join('')}
+    </tr>`).join('');
+
+  document.getElementById('financialHighlightsTable').innerHTML = `
+    <table class="w-full min-w-[820px] text-sm">
+      <thead><tr class="bg-secondary text-ink"><th class="sticky left-0 z-20 min-w-[230px] bg-secondary px-3 py-2.5 text-left text-sm font-medium">Metric</th>${headings}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+updateFinancialHighlights();
 
 // products
 const products = ["Motor Insurance","Property & Fire","Marine & Cargo","Engineering & Contractors","Aviation","Agriculture & Livestock","Micro Insurance","Miscellaneous & Liability"];
@@ -581,16 +658,6 @@ new Chart(document.getElementById('portfolioBar'),{
   options:{indexAxis:'y',maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{callback:v=>(v/1e6).toFixed(1)+'M',font:{size:11}},grid:{color:'#f1e5e2'}},y:{ticks:{font:{size:11}},grid:{display:false}}}}
 });
 
-new Chart(document.getElementById('finLine'),{
-  type:'line',
-  data:{labels:financial.map(f=>f.y),datasets:[
-    {label:'Solvency (x)',data:financial.map(f=>f.solvency),borderColor:palette[0],backgroundColor:palette[0],tension:.3,borderWidth:2.5},
-    {label:'Return on Equity %',data:financial.map(f=>f.roe),borderColor:palette[1],backgroundColor:palette[1],tension:.3,borderWidth:2},
-    {label:'EPS (NPR)',data:financial.map(f=>f.eps),borderColor:palette[3],backgroundColor:palette[3],tension:.3,borderWidth:2},
-    {label:'Net Profit Margin %',data:financial.map(f=>f.npm),borderColor:palette[4],backgroundColor:palette[4],tension:.3,borderWidth:2},
-  ]},
-  options:{maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:8,font:{size:11},usePointStyle:true}}},scales:{y:{grid:{color:'#f1e5e2'},ticks:{font:{size:11}}},x:{grid:{display:false},ticks:{font:{size:11}}}}}
-});
 </script>
 </body>
 </html>

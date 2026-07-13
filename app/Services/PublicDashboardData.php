@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Branch;
+use App\Models\FinancialHighlightImport;
 use App\Models\OutstandingClaim;
 use App\Models\Policy;
 use App\Models\Province;
@@ -26,8 +27,41 @@ class PublicDashboardData
 
         [$outstandingClaimCounts, $outstandingClaimAmounts] = $this->outstandingClaimTables();
 
+        $financialHighlightImports = FinancialHighlightImport::with('highlights')
+            ->where('status', 'completed')
+            ->latest('imported_at')
+            ->latest('id')
+            ->get();
+        $latestFinancialHighlightImport = $financialHighlightImports->first();
+        $financialHighlights = $financialHighlightImports
+            ->map(function (FinancialHighlightImport $import) {
+                $highlight = $import->highlights->first();
+                if (! $highlight) return null;
+
+                return [
+                    'fiscal_year' => $import->fiscal_year,
+                    'quarter' => (int) $import->quarter,
+                    'solvency_ratio' => $highlight->solvency_ratio,
+                    'return_on_equity' => $highlight->return_on_equity,
+                    'earnings_per_share' => $highlight->earnings_per_share,
+                    'net_worth' => $highlight->net_worth,
+                    'net_profit_margin' => $highlight->net_profit_margin,
+                    'liquidity_ratio' => $highlight->liquidity_ratio,
+                    'investment_yield' => $highlight->investment_yield,
+                    'imported_at' => $import->imported_at?->toIso8601String(),
+                ];
+            })
+            ->filter()
+            ->unique(fn (array $row) => $row['fiscal_year'].'-'.$row['quarter'])
+            ->values();
+        $fiscalYears = NepaliFiscalCalendar::fiscalYearOptions()
+            ->merge($financialHighlightImports->pluck('fiscal_year'))
+            ->unique()
+            ->sortDesc()
+            ->values();
+
         return [
-            'fiscalYears' => NepaliFiscalCalendar::fiscalYearOptions(),
+            'fiscalYears' => $fiscalYears,
             'months' => NepaliFiscalCalendar::monthNames(),
             'provinces' => $provinces,
             'districtsByProvince' => $provinces
@@ -39,6 +73,9 @@ class PublicDashboardData
             'outstandingClaimAmounts' => $outstandingClaimAmounts,
             'branchNetworkRows' => $this->branchNetworkRows(),
             'totalProvinceCount' => $provinces->count(),
+            'financialHighlights' => $financialHighlights,
+            'latestFinancialFiscalYear' => $latestFinancialHighlightImport?->fiscal_year,
+            'latestFinancialQuarter' => $latestFinancialHighlightImport?->quarter,
         ];
     }
 

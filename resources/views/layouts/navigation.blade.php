@@ -21,6 +21,42 @@
         <a href="{{ route('upload.database-history') }}" class="{{ request()->routeIs('upload.database-history') ? 'active' : '' }}">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/><path d="M8 3v18"/></svg>Database Import History
         </a>
+        <div class="nav-group" x-data="{ open: {{ request()->routeIs('financial-highlights.*') ? 'true' : 'false' }} }">
+            <button
+                type="button"
+                class="nav-parent {{ request()->routeIs('financial-highlights.*') ? 'active' : '' }}"
+                x-on:click="open = !open"
+                x-bind:aria-expanded="open.toString()"
+                aria-controls="financial-highlights-menu"
+            >
+                <span class="nav-parent-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-7"/></svg>
+                </span>
+                <span class="nav-parent-copy"><strong>Financial Highlights</strong><small>Quarterly reporting</small></span>
+                <svg class="nav-chevron" x-bind:class="{ 'open': open }" viewBox="0 0 24 24" fill="none" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+            </button>
+            <div
+                id="financial-highlights-menu"
+                class="nav-children"
+                x-show="open"
+                x-cloak
+                x-transition:enter="nav-submenu-enter"
+                x-transition:enter-start="nav-submenu-enter-start"
+                x-transition:enter-end="nav-submenu-enter-end"
+                x-transition:leave="nav-submenu-leave"
+                x-transition:leave-start="nav-submenu-enter-end"
+                x-transition:leave-end="nav-submenu-enter-start"
+            >
+                <a href="{{ route('financial-highlights.upload') }}" class="{{ request()->routeIs('financial-highlights.upload') || request()->routeIs('financial-highlights.store') || request()->routeIs('financial-highlights.template') ? 'active' : '' }}">
+                    <span class="nav-child-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M4 20h16"/></svg></span>
+                    <span>Upload</span>
+                </a>
+                <a href="{{ route('financial-highlights.import') }}" class="{{ request()->routeIs('financial-highlights.import') || request()->routeIs('financial-highlights.import.store') || request()->routeIs('financial-highlights.history') ? 'active' : '' }}">
+                    <span class="nav-child-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg></span>
+                    <span>Import &amp; History</span>
+                </a>
+            </div>
+        </div>
         <a href="{{ route('master-data.index') }}" class="{{ request()->routeIs('master-data.*') || request()->routeIs('provinces.*') || request()->routeIs('districts.*') || request()->routeIs('policies.*') ? 'active' : '' }}">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v6c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 11v6c0 1.66 4 3 9 3s9-1.34 9-3v-6"/></svg>Master Data
         </a>

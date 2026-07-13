@@ -11,6 +11,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ImportLogController;
 use App\Http\Controllers\MasterDataController;
 use App\Http\Controllers\PublicDashboardController;
+use App\Http\Controllers\FinancialHighlightController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', PublicDashboardController::class)->name('public.view');
@@ -30,6 +31,14 @@ Route::middleware('auth')->group(function () {
     Route::delete('/import-data/{importLog}', [ImportLogController::class, 'destroyImportedData'])->name('upload.import-module.destroy');
     Route::post('/upload/{importLog}/import', [ImportLogController::class, 'import'])->name('upload.import');
     Route::get('/database-import-history', [ImportLogController::class, 'databaseHistory'])->name('upload.database-history');
+
+    Route::get('/financial-highlights/upload', [FinancialHighlightController::class, 'create'])->name('financial-highlights.upload');
+    Route::post('/financial-highlights/upload', [FinancialHighlightController::class, 'store'])->name('financial-highlights.store');
+    Route::get('/financial-highlights/import', [FinancialHighlightController::class, 'importPage'])->name('financial-highlights.import');
+    Route::post('/financial-highlights/import', [FinancialHighlightController::class, 'import'])->name('financial-highlights.import.store');
+    Route::get('/financial-highlights/history', [FinancialHighlightController::class, 'history'])->name('financial-highlights.history');
+    Route::get('/financial-highlights/template', [FinancialHighlightController::class, 'template'])->name('financial-highlights.template');
+    Route::delete('/financial-highlights/{financialHighlightImport}', [FinancialHighlightController::class, 'destroy'])->name('financial-highlights.destroy');
 
     Route::get('/master-data', MasterDataController::class)->name('master-data.index');
 
