@@ -251,16 +251,22 @@ tailwind.config = {
   <!-- Outstanding Claims -->
   <div class="grid gap-6 lg:grid-cols-2">
     <section class="overflow-hidden rounded-2xl border border-line bg-white card-shadow">
-      <header class="flex items-center gap-2.5 border-b border-line bg-brand-soft px-5 py-3">
-        <span class="grid h-7 w-7 place-items-center rounded-md bg-brand text-white text-xs">⏱</span>
-        <h2 class="text-sm font-semibold tracking-wide text-brand-deep uppercase">Outstanding Claims — Number</h2>
+      <header class="flex items-center justify-between gap-3 border-b border-line bg-brand-soft px-5 py-3">
+        <div class="flex items-center gap-2.5">
+          <span class="grid h-7 w-7 place-items-center rounded-md bg-brand text-white text-xs">⏱</span>
+          <h2 class="text-sm font-semibold tracking-wide text-brand-deep uppercase">Outstanding Claims — Number</h2>
+        </div>
+        <span id="outCountPeriod" class="text-right text-xs font-semibold text-brand-deep"></span>
       </header>
       <div class="p-5 overflow-x-auto" id="outCountTable"></div>
     </section>
     <section class="overflow-hidden rounded-2xl border border-line bg-white card-shadow">
-      <header class="flex items-center gap-2.5 border-b border-line bg-brand-soft px-5 py-3">
-        <span class="grid h-7 w-7 place-items-center rounded-md bg-brand text-white text-xs">₨</span>
-        <h2 class="text-sm font-semibold tracking-wide text-brand-deep uppercase">Outstanding Claims — Amount (NPR)</h2>
+      <header class="flex items-center justify-between gap-3 border-b border-line bg-brand-soft px-5 py-3">
+        <div class="flex items-center gap-2.5">
+          <span class="grid h-7 w-7 place-items-center rounded-md bg-brand text-white text-xs">₨</span>
+          <h2 class="text-sm font-semibold tracking-wide text-brand-deep uppercase">Outstanding Claims — Amount (NPR)</h2>
+        </div>
+        <span id="outAmountPeriod" class="text-right text-xs font-semibold text-brand-deep"></span>
       </header>
       <div class="p-5 overflow-x-auto" id="outAmtTable"></div>
     </section>
@@ -339,6 +345,8 @@ const provinceSelect = document.getElementById('provinceSel');
 const districtSelect = document.getElementById('districtSel');
 const financialHighlights = @json($financialHighlights);
 const grievanceReports = @json($grievanceReports);
+const outstandingClaims = @json($outstandingClaims);
+const monthNames = @json($months);
 const latestFinancialFiscalYear = @json($latestFinancialFiscalYear);
 const latestFinancialQuarter = Number(@json($latestFinancialQuarter));
 function refreshDistricts(){
@@ -347,6 +355,7 @@ function refreshDistricts(){
   (PROV[province] || []).forEach(name => districtSelect.add(new Option(name, name)));
   districtSelect.disabled = !province;
   updateBranchNetwork();
+  updateOutstandingClaims();
 }
 function resetFilters(){
   document.querySelectorAll('select').forEach(s => { s.selectedIndex = 0; });
@@ -355,6 +364,7 @@ function resetFilters(){
   updateBranchNetwork();
   updateFinancialHighlights();
   updateGrievances();
+  updateOutstandingClaims();
 }
 function applyFilters(){
   fiscalYearSelect.dispatchEvent(new Event('change'));
@@ -364,6 +374,7 @@ function applyFilters(){
   updateBranchNetwork();
   updateFinancialHighlights();
   updateGrievances();
+  updateOutstandingClaims();
 }
 provinceSelect.addEventListener('change', refreshDistricts);
 fiscalYearSelect.addEventListener('change', updateBranchNetwork);
@@ -372,6 +383,10 @@ fiscalYearSelect.addEventListener('change', updateFinancialHighlights);
 monthSelect.addEventListener('change', updateFinancialHighlights);
 fiscalYearSelect.addEventListener('change', updateGrievances);
 monthSelect.addEventListener('change', updateGrievances);
+fiscalYearSelect.addEventListener('change', updateOutstandingClaims);
+monthSelect.addEventListener('change', updateOutstandingClaims);
+provinceSelect.addEventListener('change', updateOutstandingClaims);
+districtSelect.addEventListener('change', updateOutstandingClaims);
 districtSelect.addEventListener('change', updateBranchNetwork);
 
 function renderTable(elId, firstCol, head, rows){
@@ -419,8 +434,60 @@ renderTable('portfolioTable','Portfolio',
   ["Claims Paid","Amount (NPR)","Outstanding %","Settlement %","TAT (days)"],
   portfolio.map(r=>[r.p,r.c,npr(r.a),r.o,r.s,r.t]));
 
-renderTable('outCountTable','Portfolio',["< 1 yr","1–3 yr","3–5 yr","5+ yr","Total"],@json($outstandingClaimCounts));
-renderTable('outAmtTable','Portfolio',["< 1 yr","1–3 yr","3–5 yr","5+ yr","Total"],@json($outstandingClaimAmounts));
+function updateOutstandingClaims(){
+  const fiscalYear = fiscalYearSelect.value;
+  const requestedMonth = monthSelect.value ? Number(monthSelect.value) : null;
+  const province = provinceSelect.value;
+  const district = districtSelect.value;
+  const buckets = ['lt_1', 'yr_1_3', 'yr_3_5', 'yr_5_plus'];
+  const grouped = new Map();
+  const fiscalYearClaims = outstandingClaims.filter(claim => {
+    if (claim.fiscal_year !== fiscalYear) return false;
+    if (province && claim.province !== province) return false;
+    if (district && claim.district !== district) return false;
+    return true;
+  });
+  const availableMonths = [...new Set(fiscalYearClaims.map(claim => Number(claim.month)).filter(Boolean))];
+  const requestedMonthAvailable = requestedMonth && availableMonths.includes(requestedMonth);
+  const latestAvailableMonth = availableMonths.sort((left, right) => fiscalMonthOrder(right) - fiscalMonthOrder(left))[0] || null;
+  const displayedMonth = requestedMonthAvailable ? requestedMonth : latestAvailableMonth;
+
+  fiscalYearClaims
+    .filter(claim => displayedMonth && Number(claim.month) === displayedMonth)
+    .forEach(claim => {
+      if (!grouped.has(claim.portfolio)) {
+        grouped.set(claim.portfolio, Object.fromEntries(buckets.map(bucket => [bucket, {count: 0, amount: 0}])));
+      }
+      const values = grouped.get(claim.portfolio);
+      const bucket = values[claim.bucket] || values.yr_5_plus;
+      bucket.count += 1;
+      bucket.amount += Number(claim.amount || 0);
+    });
+
+  const entries = [...grouped.entries()].sort(([left], [right]) => left.localeCompare(right));
+  const countRows = entries.map(([portfolio, values]) => [
+    portfolio,
+    ...buckets.map(bucket => values[bucket].count),
+    buckets.reduce((total, bucket) => total + values[bucket].count, 0),
+  ]);
+  const amountRows = entries.map(([portfolio, values]) => [
+    portfolio,
+    ...buckets.map(bucket => npr(values[bucket].amount)),
+    npr(buckets.reduce((total, bucket) => total + values[bucket].amount, 0)),
+  ]);
+  const emptyRow = [['No outstanding claims for this period', '—', '—', '—', '—', '—']];
+  const usedFallback = requestedMonth && displayedMonth && requestedMonth !== displayedMonth;
+  const period = `${fiscalYear}${displayedMonth ? `<span class="block font-medium">(${monthNames[displayedMonth]})</span>` : ''}`;
+
+  document.getElementById('outCountPeriod').innerHTML = period;
+  document.getElementById('outAmountPeriod').innerHTML = period;
+  document.getElementById('outCountPeriod').title = usedFallback ? 'Selected month has no data; showing latest available month.' : '';
+  document.getElementById('outAmountPeriod').title = usedFallback ? 'Selected month has no data; showing latest available month.' : '';
+  renderTable('outCountTable', 'Portfolio', ['< 1 yr', '1–3 yr', '3–5 yr', '5+ yr', 'Total'], countRows.length ? countRows : emptyRow);
+  renderTable('outAmtTable', 'Portfolio', ['< 1 yr', '1–3 yr', '3–5 yr', '5+ yr', 'Total'], amountRows.length ? amountRows : emptyRow);
+}
+
+updateOutstandingClaims();
 
 function fiscalMonthOrder(month){
   const order = {4:1,5:2,6:3,7:4,8:5,9:6,10:7,11:8,12:9,1:10,2:11,3:12};

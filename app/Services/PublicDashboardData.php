@@ -13,20 +13,11 @@ use Illuminate\Support\Collection;
 
 class PublicDashboardData
 {
-    private const OUTSTANDING_BUCKETS = [
-        'lt_1' => '< 1 yr',
-        'yr_1_3' => '1-3 yr',
-        'yr_3_5' => '3-5 yr',
-        'yr_5_plus' => '5+ yr',
-    ];
-
     public function toArray(): array
     {
         $provinces = Province::with(['districts' => fn ($query) => $query->orderBy('district_name')])
             ->orderBy('province_name')
             ->get();
-
-        [$outstandingClaimCounts, $outstandingClaimAmounts] = $this->outstandingClaimTables();
 
         $financialHighlightImports = FinancialHighlightImport::with('highlights')
             ->where('status', 'completed')
@@ -109,8 +100,7 @@ class PublicDashboardData
                     $province->province_name => $province->districts->pluck('district_name')->values(),
                 ])
                 ->all(),
-            'outstandingClaimCounts' => $outstandingClaimCounts->all(),
-            'outstandingClaimAmounts' => $outstandingClaimAmounts->all(),
+            'outstandingClaims' => $this->outstandingClaimRows(),
             'branchNetworkRows' => $this->branchNetworkRows()->all(),
             'totalProvinceCount' => $provinces->count(),
             'financialHighlights' => $financialHighlights->all(),
@@ -120,64 +110,27 @@ class PublicDashboardData
         ];
     }
 
-    private function outstandingClaimTables(): array
+    private function outstandingClaimRows(): array
     {
         $policyLookup = Policy::with('parent')->get()->keyBy(fn ($policy) => (string) $policy->policy_id);
-        $rows = [];
 
-        OutstandingClaim::query()
-            ->get(['class', 'development_year', 'amount'])
-            ->each(function (OutstandingClaim $claim) use (&$rows, $policyLookup) {
+        return OutstandingClaim::query()
+            ->get(['fiscal_year', 'month', 'province', 'district', 'class', 'development_year', 'amount'])
+            ->map(function (OutstandingClaim $claim) use ($policyLookup) {
                 $policy = $policyLookup->get((string) $claim->class);
-                $portfolio = $policy
-                    ? ($policy->parent?->policy_name ?? $policy->policy_name)
-                    : 'Other';
-                $bucket = $this->developmentBucket($claim->development_year);
 
-                $rows[$portfolio] ??= $this->emptyOutstandingBuckets();
-                $rows[$portfolio][$bucket]['count']++;
-                $rows[$portfolio][$bucket]['amount'] += (float) $claim->amount;
-            });
-
-        ksort($rows);
-
-        $bucketKeys = collect(self::OUTSTANDING_BUCKETS)->keys();
-
-        return [
-            $this->outstandingCountRows($rows, $bucketKeys),
-            $this->outstandingAmountRows($rows, $bucketKeys),
-        ];
-    }
-
-    private function emptyOutstandingBuckets(): array
-    {
-        return collect(self::OUTSTANDING_BUCKETS)
-            ->mapWithKeys(fn ($_label, $key) => [$key => ['count' => 0, 'amount' => 0.0]])
+                return [
+                    'fiscal_year' => (string) $claim->fiscal_year,
+                    'month' => (int) $claim->month,
+                    'province' => $claim->province,
+                    'district' => $claim->district,
+                    'portfolio' => $policy ? ($policy->parent?->policy_name ?? $policy->policy_name) : 'Other',
+                    'bucket' => $this->developmentBucket($claim->development_year),
+                    'amount' => (float) $claim->amount,
+                ];
+            })
+            ->values()
             ->all();
-    }
-
-    private function outstandingCountRows(array $rows, Collection $bucketKeys): Collection
-    {
-        return collect($rows)
-            ->map(fn ($buckets, $portfolio) => array_merge(
-                [$portfolio],
-                $bucketKeys->map(fn ($key) => $buckets[$key]['count'])->all(),
-                [$bucketKeys->sum(fn ($key) => $buckets[$key]['count'])]
-            ))
-            ->values();
-    }
-
-    private function outstandingAmountRows(array $rows, Collection $bucketKeys): Collection
-    {
-        return collect($rows)
-            ->map(fn ($buckets, $portfolio) => array_merge(
-                [$portfolio],
-                $bucketKeys->map(fn ($key) => $buckets[$key]['amount'] > 0 ? number_format($buckets[$key]['amount']) : '—')->all(),
-                [$bucketKeys->sum(fn ($key) => $buckets[$key]['amount']) > 0
-                    ? number_format($bucketKeys->sum(fn ($key) => $buckets[$key]['amount']))
-                    : '—']
-            ))
-            ->values();
     }
 
     private function developmentBucket(?string $developmentYear): string

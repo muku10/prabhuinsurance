@@ -10,6 +10,7 @@ class OutstandingClaim extends Model
     protected $fillable = [
         'import_log_id',
         'fiscal_year',
+        'month',
         'development_year',
         'province',
         'district',
@@ -22,6 +23,7 @@ class OutstandingClaim extends Model
     protected function casts(): array
     {
         return [
+            'month' => 'integer',
             'amount' => 'decimal:2',
         ];
     }

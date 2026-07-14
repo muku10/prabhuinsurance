@@ -22,5 +22,6 @@ class PublicDashboardTest extends TestCase
         $this->assertIsArray($data['fiscalYears']);
         $this->assertContainsOnly('string', $data['fiscalYears']);
         $this->assertIsArray($data['provinces']);
+        $this->assertIsArray($data['outstandingClaims']);
     }
 }

@@ -563,13 +563,14 @@ class ImportLogController extends Controller
         foreach (array_slice($rows, $headerIndex + 1) as $row) {
             $mappedRow = $this->mapHeaderRow($headers, $row);
 
-            if (! $this->hasAnyValue($mappedRow, ['province', 'district', 'branch', 'department', 'class', 'amount', 'developmentyear'])) {
+            if (! $this->hasAnyValue($mappedRow, ['month', 'province', 'district', 'branch', 'department', 'class', 'amount', 'developmentyear'])) {
                 continue;
             }
 
             $records[] = [
                 'import_log_id' => $importLog->id,
                 'fiscal_year' => $importLog->fiscal_year,
+                'month' => $this->nullableInteger($mappedRow['month'] ?? null) ?? (int) $importLog->month,
                 'development_year' => $this->nullableString($mappedRow['developmentyear'] ?? null),
                 'province' => $this->nullableString($mappedRow['province'] ?? null),
                 'district' => $this->nullableString($mappedRow['district'] ?? null),
