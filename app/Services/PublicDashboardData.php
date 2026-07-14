@@ -37,7 +37,9 @@ class PublicDashboardData
         $financialHighlights = $financialHighlightImports
             ->map(function (FinancialHighlightImport $import) {
                 $highlight = $import->highlights->first();
-                if (! $highlight) return null;
+                if (! $highlight) {
+                    return null;
+                }
 
                 return [
                     'fiscal_year' => $import->fiscal_year,
@@ -98,23 +100,23 @@ class PublicDashboardData
             ->values();
 
         return [
-            'fiscalYears' => $fiscalYears,
+            'fiscalYears' => $fiscalYears->map(fn ($year) => (string) $year)->values()->all(),
             // Public reporting follows the Nepal fiscal year: Shrawan first, Asar last.
             'months' => NepaliFiscalCalendar::fiscalMonthNames(),
-            'provinces' => $provinces,
+            'provinces' => $provinces->pluck('province_name')->values()->all(),
             'districtsByProvince' => $provinces
                 ->mapWithKeys(fn ($province) => [
                     $province->province_name => $province->districts->pluck('district_name')->values(),
                 ])
                 ->all(),
-            'outstandingClaimCounts' => $outstandingClaimCounts,
-            'outstandingClaimAmounts' => $outstandingClaimAmounts,
-            'branchNetworkRows' => $this->branchNetworkRows(),
+            'outstandingClaimCounts' => $outstandingClaimCounts->all(),
+            'outstandingClaimAmounts' => $outstandingClaimAmounts->all(),
+            'branchNetworkRows' => $this->branchNetworkRows()->all(),
             'totalProvinceCount' => $provinces->count(),
-            'financialHighlights' => $financialHighlights,
+            'financialHighlights' => $financialHighlights->all(),
             'latestFinancialFiscalYear' => $latestFinancialHighlightImport?->fiscal_year,
             'latestFinancialQuarter' => $latestFinancialHighlightImport?->quarter,
-            'grievanceReports' => $grievanceReports,
+            'grievanceReports' => $grievanceReports->all(),
         ];
     }
 

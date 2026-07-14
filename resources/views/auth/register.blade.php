@@ -26,15 +26,6 @@
         </div>
 
         <!-- Role -->
-        <div class="mt-4">
-            <x-input-label for="role" :value="__('Role')" class="text-prabhu-dark" />
-            <select id="role" name="role" class="mt-1 block w-full border-gray-300 focus:border-prabhu-red-500 focus:ring-prabhu-red-500 rounded-md shadow-sm">
-                <option value="user" {{ old('role') === 'user' ? 'selected' : '' }}>User</option>
-                <option value="superadmin" {{ old('role') === 'superadmin' ? 'selected' : '' }}>Superadmin</option>
-            </select>
-            <x-input-error :messages="$errors->get('role')" class="mt-2" />
-        </div>
-
         <!-- Password -->
         <div class="mt-4">
             <x-input-label for="password" :value="__('Password')" class="text-prabhu-dark" />

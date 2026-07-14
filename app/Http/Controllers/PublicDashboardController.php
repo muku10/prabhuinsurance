@@ -3,12 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Services\PublicDashboardData;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 
 class PublicDashboardController extends Controller
 {
     public function __invoke(PublicDashboardData $dashboardData): View
     {
-        return view('public-dashboard', $dashboardData->toArray());
+        $ttl = config('dashboard.public_cache_ttl');
+        $data = $ttl > 0
+            ? Cache::remember('public-dashboard:data:v2', $ttl, fn () => $dashboardData->toArray())
+            : $dashboardData->toArray();
+
+        return view('public-dashboard', $data);
     }
 }

@@ -65,7 +65,7 @@ tailwind.config = {
       <div class="min-w-0">
         <p class="text-xs font-medium tracking-[0.25em] text-white/70 uppercase">Public Disclosure</p>
         <h1 class="truncate text-xl font-semibold sm:text-2xl">Transparency Dashboard · Prabhu Insurance Limited</h1>
-        <p class="text-xs text-white/70">Fiscal Year <span id="bannerFiscalYear">{{ $latestFinancialFiscalYear ?? $fiscalYears->first() }}</span> (YTD) · Last updated <span id="today"></span></p>
+        <p class="text-xs text-white/70">Fiscal Year <span id="bannerFiscalYear">{{ $latestFinancialFiscalYear ?? ($fiscalYears[0] ?? 'N/A') }}</span> (YTD) · Last updated <span id="today"></span></p>
       </div>
     </div>
     <div class="flex flex-wrap items-center gap-2 text-xs">
@@ -106,7 +106,7 @@ tailwind.config = {
           <select id="provinceSel" class="h-9 rounded-md border border-line bg-white px-2.5 text-sm font-medium shadow-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20">
             <option value="">All</option>
             @foreach ($provinces as $province)
-              <option value="{{ $province->province_name }}">{{ $province->province_name }}</option>
+              <option value="{{ $province }}">{{ $province }}</option>
             @endforeach
           </select>
         </label>

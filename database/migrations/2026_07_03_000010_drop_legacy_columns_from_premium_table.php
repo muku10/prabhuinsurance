@@ -2,30 +2,25 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            // SQLite cannot remove these constrained legacy columns without
+            // rebuilding the table. They are harmless in the test schema.
+            return;
+        }
+
         Schema::table('premium', function (Blueprint $table) {
             $table->dropIndex('transactions_import_batch_token_index');
             $table->dropForeign('transactions_static_policies_id_foreign');
             $table->dropForeign('transactions_static_sub_policies_id_foreign');
 
-            $table->dropColumn([
-                'import_batch_token',
-                'static_policies_id',
-                'static_sub_policies_id',
-                'number_of_issued_policy',
-                'as_on_issued_policy',
-                'number_of_gross_claim',
-                'amount_of_gross_claim',
-                'number_of_gross_claim_paid',
-                'amount_of_gross_claim_paid',
-                'number_of_outstanding_claim',
-                'amount_of_outstanding_claim',
-            ]);
+            $table->dropColumn($this->legacyColumns());
         });
     }
 
@@ -45,5 +40,22 @@ return new class extends Migration
             $table->unsignedInteger('number_of_outstanding_claim')->default(0)->after('amount_of_gross_claim_paid');
             $table->decimal('amount_of_outstanding_claim', 18, 2)->default(0)->after('number_of_outstanding_claim');
         });
+    }
+
+    private function legacyColumns(): array
+    {
+        return [
+            'import_batch_token',
+            'static_policies_id',
+            'static_sub_policies_id',
+            'number_of_issued_policy',
+            'as_on_issued_policy',
+            'number_of_gross_claim',
+            'amount_of_gross_claim',
+            'number_of_gross_claim_paid',
+            'amount_of_gross_claim_paid',
+            'number_of_outstanding_claim',
+            'amount_of_outstanding_claim',
+        ];
     }
 };

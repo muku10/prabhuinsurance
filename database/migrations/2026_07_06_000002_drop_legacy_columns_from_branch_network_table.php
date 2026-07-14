@@ -9,6 +9,12 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (DB::getDriverName() === 'sqlite') {
+            // SQLite cannot remove the constrained legacy column without
+            // rebuilding the table. It is harmless in the test schema.
+            return;
+        }
+
         $indexName = collect(DB::select('SHOW INDEX FROM branch_network'))
             ->firstWhere('Column_name', 'fiscal_year')?->Key_name;
         $foreignName = collect(DB::select("

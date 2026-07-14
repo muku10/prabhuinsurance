@@ -47,7 +47,7 @@ class FinancialHighlightController extends Controller
         $path = $file->storeAs(
             'uploads/financial-highlights/'.str_replace('/', '-', $validated['fiscal_year']).'/q'.$validated['quarter'],
             now()->format('YmdHis').'-'.$safeName,
-            'public'
+            config('filesystems.upload_disk')
         );
         $import = FinancialHighlightImport::create([
             'user_id' => auth()->id(), 'file_name' => $path,
@@ -64,8 +64,12 @@ class FinancialHighlightController extends Controller
         $imports = FinancialHighlightImport::whereIn('status', ['pending', 'failed'])->latest()->get();
         $selected = $imports->firstWhere('id', $request->integer('import_id')) ?? $imports->first();
         $historyQuery = FinancialHighlightImport::with(['user', 'highlights'])->where('status', 'completed');
-        if ($request->filled('fiscal_year')) $historyQuery->where('fiscal_year', $request->string('fiscal_year'));
-        if ($request->filled('quarter')) $historyQuery->where('quarter', $request->integer('quarter'));
+        if ($request->filled('fiscal_year')) {
+            $historyQuery->where('fiscal_year', $request->string('fiscal_year'));
+        }
+        if ($request->filled('quarter')) {
+            $historyQuery->where('quarter', $request->integer('quarter'));
+        }
 
         return view('financial-highlights.import', [
             'imports' => $imports,
@@ -87,7 +91,7 @@ class FinancialHighlightController extends Controller
         try {
             DB::transaction(function () use ($import) {
                 $import->update(['status' => 'processing', 'error_message' => null]);
-                $rows = IOFactory::load(Storage::disk('public')->path($import->file_name))->getActiveSheet()->toArray(null, true, true, false);
+                $rows = IOFactory::load(Storage::disk(config('filesystems.upload_disk'))->path($import->file_name))->getActiveSheet()->toArray(null, true, true, false);
                 $headerIndex = $this->headerIndex($rows);
                 if ($headerIndex === null) {
                     throw new \RuntimeException('Required financial highlight headings were not found. Download the template and use its headings.');
@@ -98,7 +102,9 @@ class FinancialHighlightController extends Controller
                     $record = ['fiscal_year' => $import->fiscal_year, 'quarter' => $import->quarter];
                     $hasValue = false;
                     foreach ($headers as $column => $header) {
-                        if (! isset(self::FIELDS[$header])) continue;
+                        if (! isset(self::FIELDS[$header])) {
+                            continue;
+                        }
                         $value = $row[$column] ?? null;
                         if ($value !== null && trim((string) $value) !== '') {
                             if (! is_numeric(str_replace([',', '%'], '', (string) $value))) {
@@ -110,9 +116,13 @@ class FinancialHighlightController extends Controller
                             $record[self::FIELDS[$header]] = null;
                         }
                     }
-                    if ($hasValue) $records[] = $record;
+                    if ($hasValue) {
+                        $records[] = $record;
+                    }
                 }
-                if ($records === []) throw new \RuntimeException('No financial highlight data rows were found.');
+                if ($records === []) {
+                    throw new \RuntimeException('No financial highlight data rows were found.');
+                }
 
                 $import->highlights()->delete();
                 $import->highlights()->createMany($records);
@@ -120,6 +130,7 @@ class FinancialHighlightController extends Controller
             });
         } catch (\Throwable $e) {
             $import->update(['status' => 'failed', 'error_message' => $e->getMessage()]);
+
             return back()->withErrors(['file' => 'Import failed: '.$e->getMessage()])->withInput();
         }
 
@@ -133,18 +144,22 @@ class FinancialHighlightController extends Controller
 
     public function destroy(FinancialHighlightImport $financialHighlightImport): RedirectResponse
     {
-        Storage::disk('public')->delete($financialHighlightImport->file_name);
+        Storage::disk(config('filesystems.upload_disk'))->delete($financialHighlightImport->file_name);
         $financialHighlightImport->delete();
+
         return back()->with('toast', ['message' => 'Financial highlight import and its data were deleted.', 'type' => 'success']);
     }
 
     public function template(): StreamedResponse
     {
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->fromArray([['Solvency Ratio (x)', 'Return on Equity (%)', 'Earnings per Share (NPR)', 'Net Worth (NPR)', 'Net Profit Margin (%)', 'Liquidity Ratio', 'Investment Yield (%)']]);
         $sheet->getStyle('A1:G1')->getFont()->setBold(true);
-        foreach (range('A', 'G') as $column) $sheet->getColumnDimension($column)->setAutoSize(true);
+        foreach (range('A', 'G') as $column) {
+            $sheet->getColumnDimension($column)->setAutoSize(true);
+        }
+
         return response()->streamDownload(fn () => (new Xlsx($spreadsheet))->save('php://output'), 'financial-highlights-template.xlsx');
     }
 
@@ -152,8 +167,11 @@ class FinancialHighlightController extends Controller
     {
         foreach ($rows as $index => $row) {
             $normalized = array_map(fn ($value) => $this->normalize((string) $value), $row);
-            if (count(array_intersect(array_keys(self::FIELDS), $normalized)) === count(self::FIELDS)) return $index;
+            if (count(array_intersect(array_keys(self::FIELDS), $normalized)) === count(self::FIELDS)) {
+                return $index;
+            }
         }
+
         return null;
     }
 

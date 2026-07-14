@@ -30,7 +30,7 @@ Route::middleware('guest')->group(function () {
         ->name('password.store');
 });
 
-Route::middleware(['auth', 'superadmin'])->group(function () {
+Route::middleware('auth')->group(function () {
     Route::get('register', [RegisteredUserController::class, 'create'])
         ->name('register');
 

@@ -2,11 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Branch;
 use App\Models\Complain;
 use App\Models\District;
-use App\Models\ImportLog;
 use App\Models\GrievanceType;
+use App\Models\ImportLog;
 use App\Models\IntimationClaim;
 use App\Models\OutstandingClaim;
 use App\Models\PaidClaim;
@@ -16,10 +15,9 @@ use App\Models\WithdrawalClaim;
 use Carbon\CarbonInterface;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 
@@ -139,7 +137,7 @@ class ImportLogController extends Controller
             $safeName = preg_replace('/[^A-Za-z0-9_-]/', '-', $baseName);
             $fileName = now()->format('YmdHis').'-'.$uploadType.'-'.$safeName.'.'.$extension;
             $storagePath = 'uploads/'.$uploadType.'/'.$fiscalYearFolder.'/'.$monthFolder;
-            $storedFile = $file->storeAs($storagePath, $fileName, 'public');
+            $storedFile = $file->storeAs($storagePath, $fileName, config('filesystems.upload_disk'));
 
             $createdImportLogs[] = ImportLog::create([
                 'date' => $today->toDateString(),
@@ -212,10 +210,10 @@ class ImportLogController extends Controller
             $monthFolder = str_pad((string) $validated['month'], 2, '0', STR_PAD_LEFT);
             $storagePath = 'uploads/'.($validated['upload_type'] ?? 'legacy').'/'.$fiscalYearFolder.'/'.$monthFolder;
 
-            $validated['file_name'] = $file->storeAs($storagePath, $fileName, 'public');
+            $validated['file_name'] = $file->storeAs($storagePath, $fileName, config('filesystems.upload_disk'));
 
             if ($importLog->file_name) {
-                Storage::disk('public')->delete($importLog->file_name);
+                Storage::disk(config('filesystems.upload_disk'))->delete($importLog->file_name);
             }
         }
 
@@ -230,7 +228,7 @@ class ImportLogController extends Controller
     public function destroy(ImportLog $importLog): RedirectResponse
     {
         if ($importLog->file_name) {
-            Storage::disk('public')->delete($importLog->file_name);
+            Storage::disk(config('filesystems.upload_disk'))->delete($importLog->file_name);
         }
 
         $importLog->delete();
@@ -269,7 +267,7 @@ class ImportLogController extends Controller
             DB::transaction(function () use ($importLog) {
                 $importLog->update(['status' => 'processing']);
 
-                $filePath = Storage::disk('public')->path($importLog->file_name);
+                $filePath = Storage::disk(config('filesystems.upload_disk'))->path($importLog->file_name);
                 $spreadsheet = IOFactory::load($filePath);
 
                 $uploadType = $this->normalizeUploadType($importLog->upload_type);
@@ -816,7 +814,7 @@ class ImportLogController extends Controller
         return round((float) str_replace(',', '', (string) $value), 2);
     }
 
-    private function sanitizeForeignKey(mixed $value, \Illuminate\Support\Collection $validIds): ?int
+    private function sanitizeForeignKey(mixed $value, Collection $validIds): ?int
     {
         $normalized = $this->nullableInteger($value);
 
