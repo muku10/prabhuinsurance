@@ -346,6 +346,7 @@ const districtSelect = document.getElementById('districtSel');
 const financialHighlights = @json($financialHighlights);
 const grievanceReports = @json($grievanceReports);
 const outstandingClaims = @json($outstandingClaims);
+const portfolioClaimRows = @json($portfolioClaimRows);
 const monthNames = @json($months);
 const latestFinancialFiscalYear = @json($latestFinancialFiscalYear);
 const latestFinancialQuarter = Number(@json($latestFinancialQuarter));
@@ -356,6 +357,7 @@ function refreshDistricts(){
   districtSelect.disabled = !province;
   updateBranchNetwork();
   updateOutstandingClaims();
+  updatePortfolioClaims();
 }
 function resetFilters(){
   document.querySelectorAll('select').forEach(s => { s.selectedIndex = 0; });
@@ -365,6 +367,7 @@ function resetFilters(){
   updateFinancialHighlights();
   updateGrievances();
   updateOutstandingClaims();
+  updatePortfolioClaims();
 }
 function applyFilters(){
   fiscalYearSelect.dispatchEvent(new Event('change'));
@@ -387,6 +390,10 @@ fiscalYearSelect.addEventListener('change', updateOutstandingClaims);
 monthSelect.addEventListener('change', updateOutstandingClaims);
 provinceSelect.addEventListener('change', updateOutstandingClaims);
 districtSelect.addEventListener('change', updateOutstandingClaims);
+fiscalYearSelect.addEventListener('change', updatePortfolioClaims);
+monthSelect.addEventListener('change', updatePortfolioClaims);
+provinceSelect.addEventListener('change', updatePortfolioClaims);
+districtSelect.addEventListener('change', updatePortfolioClaims);
 districtSelect.addEventListener('change', updateBranchNetwork);
 
 function renderTable(elId, firstCol, head, rows){
@@ -420,19 +427,71 @@ renderTable('policyTable','Metric',years,[
   ["Loss Ratio (%)","19.3%","19.5%","19.2%","19.4%","19.1%"],
 ]);
 
-const portfolio = [
-  { p:"Property", c:1, a:140855, o:"33%", s:"67%", t:46 },
-  { p:"Motor", c:75, a:11696154, o:"46%", s:"54%", t:178 },
-  { p:"Marine", c:0, a:0, o:"0%", s:"0%", t:0 },
-  { p:"Engineering", c:1, a:29817, o:"40%", s:"60%", t:260 },
-  { p:"Aviation", c:0, a:0, o:"0%", s:"100%", t:0 },
-  { p:"Agriculture", c:0, a:0, o:"0%", s:"100%", t:0 },
-  { p:"Micro", c:0, a:0, o:"0%", s:"100%", t:0 },
-  { p:"Miscellaneous", c:618, a:7353183, o:"43%", s:"57%", t:24 },
-];
-renderTable('portfolioTable','Portfolio',
-  ["Claims Paid","Amount (NPR)","Outstanding %","Settlement %","TAT (days)"],
-  portfolio.map(r=>[r.p,r.c,npr(r.a),r.o,r.s,r.t]));
+let portfolioBarChart;
+
+function latestPortfolioMonth(rows){
+  return rows.reduce((latest, row) => fiscalMonthOrder(row.month) > fiscalMonthOrder(latest) ? Number(row.month) : latest, null);
+}
+
+function latestCommonClaimSnapshotMonth(rows){
+  const intimationMonths = new Set(rows
+    .filter(row => row.type === 'intimation')
+    .map(row => Number(row.month)));
+  const commonRows = rows.filter(row => row.type === 'outstanding' && intimationMonths.has(Number(row.month)));
+  return latestPortfolioMonth(commonRows);
+}
+
+function updatePortfolioClaims(){
+  const fiscalYear = fiscalYearSelect.value;
+  const province = provinceSelect.value;
+  const district = districtSelect.value;
+  const scoped = portfolioClaimRows.filter(row => row.fiscal_year === fiscalYear
+    && (!province || row.province === province)
+    && (!district || row.district === district));
+  const selectedMonth = monthSelect.value ? Number(monthSelect.value) : null;
+  const snapshotMonth = selectedMonth || latestCommonClaimSnapshotMonth(scoped);
+  const cutoffMonth = selectedMonth || latestPortfolioMonth(scoped);
+  const cutoffOrder = fiscalMonthOrder(cutoffMonth);
+  const grouped = new Map();
+
+  scoped.filter(row => {
+    const order = fiscalMonthOrder(row.month);
+    if (row.type === 'intimation') return snapshotMonth !== null && Number(row.month) === snapshotMonth;
+    if (row.type === 'outstanding') return snapshotMonth !== null && Number(row.month) === snapshotMonth;
+    return order > 0 && order <= cutoffOrder;
+  }).forEach(row => {
+    if (!grouped.has(row.portfolio)) grouped.set(row.portfolio, {intimation:0, outstanding:0, paid:0, amount:0, tat:0});
+    const item = grouped.get(row.portfolio);
+    item[row.type] = (item[row.type] || 0) + Number(row.count || 0);
+    if (row.type === 'paid') {
+      item.amount += Number(row.amount || 0);
+      item.tat += Number(row.turnaround_days || 0);
+    }
+  });
+
+  const portfolio = [...grouped.entries()].map(([name, item]) => ({
+    p: name,
+    c: item.paid,
+    a: item.amount,
+    o: item.intimation ? (item.outstanding / item.intimation) * 100 : 0,
+    s: item.intimation ? 100 - ((item.outstanding / item.intimation) * 100) : 0,
+    t: item.paid ? item.tat / item.paid : 0,
+  })).sort((left, right) => left.p.localeCompare(right.p));
+
+  const percent = value => `${new Intl.NumberFormat('en-IN', {maximumFractionDigits:2}).format(value)}%`;
+  renderTable('portfolioTable', 'Portfolio',
+    ['Claims Paid', 'Amount (NPR)', 'Outstanding %', 'Settlement %', 'TAT (days)'],
+    portfolio.length ? portfolio.map(row => [row.p, row.c, npr(row.a), percent(row.o), percent(row.s), Math.round(row.t)])
+      : [['No claim data for this period', '—', '—', '—', '—', '—']]);
+
+  if (portfolioBarChart) portfolioBarChart.destroy();
+  const barData = portfolio.filter(row => row.a > 0);
+  portfolioBarChart = new Chart(document.getElementById('portfolioBar'), {
+    type:'bar',
+    data:{labels:barData.map(row=>row.p),datasets:[{label:'Amount (NPR)',data:barData.map(row=>row.a),backgroundColor:barData.map((_,i)=>palette[i%palette.length]),borderRadius:6}]},
+    options:{indexAxis:'y',maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{callback:value=>(value/1e6).toFixed(1)+'M',font:{size:11}},grid:{color:'#f1e5e2'}},y:{ticks:{font:{size:11}},grid:{display:false}}}}
+  });
+}
 
 function updateOutstandingClaims(){
   const fiscalYear = fiscalYearSelect.value;
@@ -753,12 +812,7 @@ new Chart(document.getElementById('premiumPie'),{
   options:{plugins:{legend:{display:false}},cutout:'62%',maintainAspectRatio:false}
 });
 
-const barData = portfolio.filter(p=>p.a>0);
-new Chart(document.getElementById('portfolioBar'),{
-  type:'bar',
-  data:{labels:barData.map(p=>p.p),datasets:[{label:'Amount (NPR)',data:barData.map(p=>p.a),backgroundColor:barData.map((_,i)=>palette[i%palette.length]),borderRadius:6}]},
-  options:{indexAxis:'y',maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{callback:v=>(v/1e6).toFixed(1)+'M',font:{size:11}},grid:{color:'#f1e5e2'}},y:{ticks:{font:{size:11}},grid:{display:false}}}}
-});
+updatePortfolioClaims();
 
 </script>
 </body>

@@ -6,8 +6,12 @@ use App\Models\Branch;
 use App\Models\Complain;
 use App\Models\FinancialHighlightImport;
 use App\Models\OutstandingClaim;
+use App\Models\IntimationClaim;
+use App\Models\ImportLog;
+use App\Models\PaidClaim;
 use App\Models\Policy;
 use App\Models\Province;
+use App\Models\WithdrawalClaim;
 use App\Support\NepaliFiscalCalendar;
 use Illuminate\Support\Collection;
 
@@ -101,6 +105,7 @@ class PublicDashboardData
                 ])
                 ->all(),
             'outstandingClaims' => $this->outstandingClaimRows(),
+            'portfolioClaimRows' => $this->portfolioClaimRows(),
             'branchNetworkRows' => $this->branchNetworkRows()->all(),
             'totalProvinceCount' => $provinces->count(),
             'financialHighlights' => $financialHighlights->all(),
@@ -110,21 +115,90 @@ class PublicDashboardData
         ];
     }
 
+    private function portfolioClaimRows(): array
+    {
+        $policyLookup = $this->policyLookup();
+        $rows = collect();
+
+        $append = function ($claims, string $type, ?string $amountColumn = null, ?string $turnaroundColumn = null) use ($rows, $policyLookup): void {
+            foreach ($claims as $claim) {
+                $policy = $policyLookup->get((string) $claim->department);
+                $rows->push([
+                    'type' => $type,
+                    'fiscal_year' => (string) $claim->fiscal_year,
+                    'month' => (int) $claim->month,
+                    'province' => $claim->province,
+                    'district' => $claim->district,
+                    // Department is the policy/portfolio; class is its sub-policy.
+                    'portfolio' => $policy?->policy_name ?? $claim->department ?? 'Other',
+                    'sub_policy' => $claim->class,
+                    'amount' => $amountColumn ? (float) $claim->{$amountColumn} : 0,
+                    'turnaround_days' => $turnaroundColumn ? (int) $claim->{$turnaroundColumn} : 0,
+                ]);
+            }
+        };
+
+        $append(IntimationClaim::query()->whereIn('import_log_id', $this->latestMonthlyImportIds('intimation_claim'))->get(), 'intimation');
+        $append(OutstandingClaim::query()->whereIn('import_log_id', $this->latestMonthlyImportIds('outstanding_claim'))->get(), 'outstanding', 'amount');
+        $append(PaidClaim::query()->whereIn('import_log_id', $this->latestMonthlyImportIds('paid_claim'))->get(), 'paid', 'total_paid_amount', 'turnaround_days');
+        $append(WithdrawalClaim::query()->whereIn('import_log_id', $this->latestMonthlyImportIds('withdrawal_claim'))->get(), 'withdrawal');
+
+        return $rows
+            ->groupBy(fn (array $row) => implode('|', [
+                $row['type'],
+                $row['fiscal_year'],
+                $row['month'],
+                $row['province'],
+                $row['district'],
+                $row['portfolio'],
+            ]))
+            ->map(function (Collection $group) {
+                $row = $group->first();
+
+                return array_merge($row, [
+                    'count' => $group->count(),
+                    'amount' => (float) $group->sum('amount'),
+                    'turnaround_days' => (int) $group->sum('turnaround_days'),
+                ]);
+            })
+            ->values()
+            ->all();
+    }
+
+    private function latestMonthlyImportIds(string $uploadType): array
+    {
+        return ImportLog::query()
+            ->where('upload_type', $uploadType)
+            ->where('status', 'completed')
+            ->orderByDesc('date')
+            ->orderByDesc('id')
+            ->get(['id', 'fiscal_year', 'month'])
+            ->unique(fn (ImportLog $import) => $import->fiscal_year.'|'.$import->month)
+            ->pluck('id')
+            ->all();
+    }
+
+    private function policyLookup(): Collection
+    {
+        return Policy::with('parent')->get()->keyBy(fn ($policy) => (string) $policy->policy_id);
+    }
+
     private function outstandingClaimRows(): array
     {
-        $policyLookup = Policy::with('parent')->get()->keyBy(fn ($policy) => (string) $policy->policy_id);
+        $policyLookup = $this->policyLookup();
 
         return OutstandingClaim::query()
-            ->get(['fiscal_year', 'month', 'province', 'district', 'class', 'development_year', 'amount'])
+            ->whereIn('import_log_id', $this->latestMonthlyImportIds('outstanding_claim'))
+            ->get(['fiscal_year', 'month', 'province', 'district', 'department', 'class', 'development_year', 'amount'])
             ->map(function (OutstandingClaim $claim) use ($policyLookup) {
-                $policy = $policyLookup->get((string) $claim->class);
+                $policy = $policyLookup->get((string) $claim->department);
 
                 return [
                     'fiscal_year' => (string) $claim->fiscal_year,
                     'month' => (int) $claim->month,
                     'province' => $claim->province,
                     'district' => $claim->district,
-                    'portfolio' => $policy ? ($policy->parent?->policy_name ?? $policy->policy_name) : 'Other',
+                    'portfolio' => $policy?->policy_name ?? $claim->department ?? 'Other',
                     'bucket' => $this->developmentBucket($claim->development_year),
                     'amount' => (float) $claim->amount,
                 ];
