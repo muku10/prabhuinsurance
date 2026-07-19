@@ -55,6 +55,7 @@ class PublicDashboardTest extends TestCase
         $this->assertIsArray($data['provinces']);
         $this->assertIsArray($data['outstandingClaims']);
         $this->assertIsArray($data['portfolioClaimRows']);
+        $this->assertIsArray($data['premiumRows']);
     }
 
     public function test_portfolio_claim_rows_normalize_intimation_statuses_and_keep_imports_separate(): void

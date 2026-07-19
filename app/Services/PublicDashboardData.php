@@ -11,6 +11,7 @@ use App\Models\IntimationClaim;
 use App\Models\ImportLog;
 use App\Models\PaidClaim;
 use App\Models\Policy;
+use App\Models\Premium;
 use App\Models\Province;
 use App\Support\NepaliFiscalCalendar;
 use Illuminate\Support\Collection;
@@ -107,6 +108,7 @@ class PublicDashboardData
                 ->all(),
             'outstandingClaims' => $this->outstandingClaimRows(),
             'portfolioClaimRows' => $this->portfolioClaimRows(),
+            'premiumRows' => $this->premiumRows(),
             'branchNetworkRows' => $this->branchNetworkRows()->all(),
             'totalProvinceCount' => $provinces->count(),
             'financialHighlights' => $financialHighlights->all(),
@@ -175,6 +177,44 @@ class PublicDashboardData
                     'amount' => (float) $group->sum('amount'),
                     'turnaround_days' => (int) $group->sum('turnaround_days'),
                 ]);
+            })
+            ->values()
+            ->all();
+    }
+
+    private function premiumRows(): array
+    {
+        $importIds = ImportLog::query()
+            ->where('upload_type', 'premium')
+            ->where('status', 'completed')
+            ->pluck('id');
+
+        return Premium::query()
+            ->with(['province:province_id,province_name', 'district:district_id,district_name'])
+            ->whereIn('import_log_id', $importIds)
+            ->get()
+            ->groupBy(fn (Premium $row) => implode('|', [
+                $row->import_log_id,
+                $row->fiscal_year,
+                $row->month,
+                $row->state_id,
+                $row->district_id,
+            ]))
+            ->map(function (Collection $group) {
+                /** @var Premium $row */
+                $row = $group->first();
+
+                return [
+                    'import_id' => (int) $row->import_log_id,
+                    'fiscal_year' => (string) $row->fiscal_year,
+                    'month' => (int) $row->month,
+                    'province' => $row->province?->province_name,
+                    'district' => $row->district?->district_name,
+                    'fresh_policy' => (int) $group->sum('fresh_policy'),
+                    'renewal_policy' => (int) $group->sum('renewal_policy'),
+                    'endorsed_policy' => (int) $group->sum('endrosement_policy'),
+                    'gross_premium' => (float) $group->sum('gross_premium_income'),
+                ];
             })
             ->values()
             ->all();

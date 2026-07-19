@@ -347,6 +347,7 @@ const financialHighlights = @json($financialHighlights);
 const grievanceReports = @json($grievanceReports);
 const outstandingClaims = @json($outstandingClaims);
 const portfolioClaimRows = @json($portfolioClaimRows);
+const premiumRows = @json($premiumRows);
 const monthNames = @json($months);
 const latestFinancialFiscalYear = @json($latestFinancialFiscalYear);
 const latestFinancialQuarter = Number(@json($latestFinancialQuarter));
@@ -358,6 +359,7 @@ function refreshDistricts(){
   updateBranchNetwork();
   updateOutstandingClaims();
   updatePortfolioClaims();
+  updatePolicyPremium();
 }
 function resetFilters(){
   document.querySelectorAll('select').forEach(s => { s.selectedIndex = 0; });
@@ -368,6 +370,7 @@ function resetFilters(){
   updateGrievances();
   updateOutstandingClaims();
   updatePortfolioClaims();
+  updatePolicyPremium();
 }
 function applyFilters(){
   fiscalYearSelect.dispatchEvent(new Event('change'));
@@ -378,6 +381,7 @@ function applyFilters(){
   updateFinancialHighlights();
   updateGrievances();
   updateOutstandingClaims();
+  updatePolicyPremium();
 }
 provinceSelect.addEventListener('change', refreshDistricts);
 fiscalYearSelect.addEventListener('change', updateBranchNetwork);
@@ -394,6 +398,10 @@ fiscalYearSelect.addEventListener('change', updatePortfolioClaims);
 monthSelect.addEventListener('change', updatePortfolioClaims);
 provinceSelect.addEventListener('change', updatePortfolioClaims);
 districtSelect.addEventListener('change', updatePortfolioClaims);
+fiscalYearSelect.addEventListener('change', updatePolicyPremium);
+monthSelect.addEventListener('change', updatePolicyPremium);
+provinceSelect.addEventListener('change', updatePolicyPremium);
+districtSelect.addEventListener('change', updatePolicyPremium);
 districtSelect.addEventListener('change', updateBranchNetwork);
 
 function renderTable(elId, firstCol, head, rows){
@@ -417,15 +425,50 @@ renderTable('claimsTable','Metric',years,[
   ["Claim Turnaround (days)",41,46,51,58,64],
 ]);
 
-renderTable('policyTable','Metric',years,[
-  ["Total Policies","48,210","44,905","41,220","38,140","35,010"],
-  ["New Policies","9,120","8,204","7,510","7,015","6,412"],
-  ["Renewal Policies","37,190","35,110","32,090","29,455","27,010"],
-  ["Endorsed Policies","1,900","1,591","1,620","1,670","1,588"],
-  ["Gross Premium (NPR)","99,441,499","91,720,110","84,015,220","77,120,540","70,880,110"],
-  ["Premium Growth Rate (%)","8.4%","9.2%","8.9%","8.8%","—"],
-  ["Loss Ratio (%)","19.3%","19.5%","19.2%","19.4%","19.1%"],
-]);
+function updatePolicyPremium(){
+  const selectedFiscalYear = fiscalYearSelect.value;
+  const selectedMonth = monthSelect.value ? Number(monthSelect.value) : null;
+  const province = provinceSelect.value;
+  const district = districtSelect.value;
+  const fiscalYears = fiveFiscalYearsFrom(selectedFiscalYear);
+  const values = fiscalYears.map(fiscalYear => {
+    const yearRows = premiumRows.filter(row => row.fiscal_year === fiscalYear);
+    // This section follows the supplied workbook: calculate one exact reporting
+    // month, not YTD. If no month is selected, use the latest available month.
+    const reportingMonth = selectedMonth || latestPortfolioMonth(yearRows);
+    const eligible = yearRows.filter(row => Number(row.month) === reportingMonth);
+    const latestImportId = eligible.reduce((latest, row) => Math.max(latest, Number(row.import_id || 0)), 0);
+    const rows = eligible.filter(row => Number(row.import_id) === latestImportId
+      && (!province || row.province === province)
+      && (!district || row.district === district));
+    const sum = key => rows.reduce((total, row) => total + Number(row[key] || 0), 0);
+    const fresh = sum('fresh_policy');
+    const renewal = sum('renewal_policy');
+    const endorsed = sum('endorsed_policy');
+    const gross = sum('gross_premium');
+    const paidAmount = portfolioClaimRows.filter(row => row.type === 'paid'
+      && row.fiscal_year === fiscalYear
+      && Number(row.month) === reportingMonth
+      && (!province || row.province === province)
+      && (!district || row.district === district))
+      .reduce((total, row) => total + Number(row.amount || 0), 0);
+    return {fresh, renewal, endorsed, total:fresh + renewal + endorsed, gross, paidAmount};
+  });
+  const percent = value => value === null ? '—' : `${new Intl.NumberFormat('en-IN', {maximumFractionDigits:2}).format(value)}%`;
+  const growth = values.map((value, index) => {
+    const previous = values[index + 1];
+    return previous && previous.gross ? ((value.gross - previous.gross) / previous.gross) * 100 : null;
+  });
+  renderTable('policyTable', 'Metric', fiscalYears, [
+    ['Total Policies', ...values.map(value => npr(value.total))],
+    ['New Policies', ...values.map(value => npr(value.fresh))],
+    ['Renewal Policies', ...values.map(value => npr(value.renewal))],
+    ['Endorsed Policies', ...values.map(value => npr(value.endorsed))],
+    ['Gross Premium (NPR)', ...values.map(value => npr(value.gross))],
+    ['Premium Growth Rate (%)', ...growth.map(percent)],
+    ['Loss Ratio (%)', ...values.map(value => percent(value.gross ? (value.paidAmount / value.gross) * 100 : null))],
+  ]);
+}
 
 let portfolioBarChart;
 
@@ -449,15 +492,19 @@ function updatePortfolioClaims(){
   const selectedIntimations = scoped.filter(row => row.type === 'intimation'
     && Number(row.import_id) === latestIntimationImportId
     && (!selectedMonth || Number(row.month) === selectedMonth));
-  const selectedIntimationMonths = new Set(selectedIntimations.map(row => Number(row.month)));
+  const paidCutoffMonth = selectedMonth || latestPortfolioMonth(selectedIntimations);
+  const paidCutoffOrder = fiscalMonthOrder(paidCutoffMonth);
   const grouped = new Map();
 
   scoped.filter(row => {
     if (row.type === 'intimation') return Number(row.import_id) === latestIntimationImportId
       && (!selectedMonth || Number(row.month) === selectedMonth);
-    // Excel uses the paid-claim rows from the exact selected month. With no month
-    // filter, use the months present in the selected latest intimation file.
-    if (row.type === 'paid') return selectedIntimationMonths.has(Number(row.month));
+    // Paid-claim files contain the current month's movement, so accumulate the
+    // latest file for every month through the selected reporting month.
+    if (row.type === 'paid') {
+      const order = fiscalMonthOrder(row.month);
+      return paidCutoffOrder > 0 && order > 0 && order <= paidCutoffOrder;
+    }
     return false;
   }).forEach(row => {
     if (!grouped.has(row.portfolio)) grouped.set(row.portfolio, {totalRows:0, outstanding:0, paid:0, withdrawal:0, paidClaimCount:0, amount:0, tat:0, tatCount:0});
@@ -818,6 +865,7 @@ new Chart(document.getElementById('premiumPie'),{
 });
 
 updatePortfolioClaims();
+updatePolicyPremium();
 
 </script>
 </body>
