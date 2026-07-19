@@ -433,49 +433,54 @@ function latestPortfolioMonth(rows){
   return rows.reduce((latest, row) => fiscalMonthOrder(row.month) > fiscalMonthOrder(latest) ? Number(row.month) : latest, null);
 }
 
-function latestCommonClaimSnapshotMonth(rows){
-  const intimationMonths = new Set(rows
-    .filter(row => row.type === 'intimation')
-    .map(row => Number(row.month)));
-  const commonRows = rows.filter(row => row.type === 'outstanding' && intimationMonths.has(Number(row.month)));
-  return latestPortfolioMonth(commonRows);
-}
-
 function updatePortfolioClaims(){
   const fiscalYear = fiscalYearSelect.value;
   const province = provinceSelect.value;
   const district = districtSelect.value;
-  const scoped = portfolioClaimRows.filter(row => row.fiscal_year === fiscalYear
-    && (!province || row.province === province)
-    && (!district || row.district === district));
   const selectedMonth = monthSelect.value ? Number(monthSelect.value) : null;
-  const snapshotMonth = selectedMonth || latestCommonClaimSnapshotMonth(scoped);
-  const cutoffMonth = selectedMonth || latestPortfolioMonth(scoped);
-  const cutoffOrder = fiscalMonthOrder(cutoffMonth);
+  const fiscalYearRows = portfolioClaimRows.filter(row => row.fiscal_year === fiscalYear);
+  // With a month filter, only files that actually contain that month qualify.
+  // The highest import id is the latest uploaded qualifying file.
+  const eligibleIntimations = fiscalYearRows.filter(row => row.type === 'intimation'
+    && (!selectedMonth || Number(row.month) === selectedMonth));
+  const latestIntimationImportId = eligibleIntimations.reduce((latest, row) => Math.max(latest, Number(row.import_id || 0)), 0);
+  const scoped = fiscalYearRows.filter(row => (!province || row.province === province)
+    && (!district || row.district === district));
+  const selectedIntimations = scoped.filter(row => row.type === 'intimation'
+    && Number(row.import_id) === latestIntimationImportId
+    && (!selectedMonth || Number(row.month) === selectedMonth));
+  const selectedIntimationMonths = new Set(selectedIntimations.map(row => Number(row.month)));
   const grouped = new Map();
 
   scoped.filter(row => {
-    const order = fiscalMonthOrder(row.month);
-    if (row.type === 'intimation') return snapshotMonth !== null && Number(row.month) === snapshotMonth;
-    if (row.type === 'outstanding') return snapshotMonth !== null && Number(row.month) === snapshotMonth;
-    return order > 0 && order <= cutoffOrder;
+    if (row.type === 'intimation') return Number(row.import_id) === latestIntimationImportId
+      && (!selectedMonth || Number(row.month) === selectedMonth);
+    // Excel uses the paid-claim rows from the exact selected month. With no month
+    // filter, use the months present in the selected latest intimation file.
+    if (row.type === 'paid') return selectedIntimationMonths.has(Number(row.month));
+    return false;
   }).forEach(row => {
-    if (!grouped.has(row.portfolio)) grouped.set(row.portfolio, {intimation:0, outstanding:0, paid:0, amount:0, tat:0});
+    if (!grouped.has(row.portfolio)) grouped.set(row.portfolio, {totalRows:0, outstanding:0, paid:0, withdrawal:0, paidClaimCount:0, amount:0, tat:0, tatCount:0});
     const item = grouped.get(row.portfolio);
-    item[row.type] = (item[row.type] || 0) + Number(row.count || 0);
-    if (row.type === 'paid') {
+    if (row.type === 'intimation') {
+      // Every row in the chosen file/month is part of the denominator, regardless of status.
+      item.totalRows += Number(row.count || 0);
+      if (['outstanding', 'paid', 'withdrawal'].includes(row.status)) item[row.status] += Number(row.count || 0);
+    } else if (row.type === 'paid') {
+      item.paidClaimCount += Number(row.count || 0);
       item.amount += Number(row.amount || 0);
       item.tat += Number(row.turnaround_days || 0);
+      item.tatCount += Number(row.count || 0);
     }
   });
 
   const portfolio = [...grouped.entries()].map(([name, item]) => ({
     p: name,
-    c: item.paid,
+    c: item.paidClaimCount,
     a: item.amount,
-    o: item.intimation ? (item.outstanding / item.intimation) * 100 : 0,
-    s: item.intimation ? 100 - ((item.outstanding / item.intimation) * 100) : 0,
-    t: item.paid ? item.tat / item.paid : 0,
+    o: item.totalRows ? (item.outstanding / item.totalRows) * 100 : 0,
+    s: item.totalRows ? 100 - ((item.outstanding / item.totalRows) * 100) : 0,
+    t: item.tatCount ? item.tat / item.tatCount : 0,
   })).sort((left, right) => left.p.localeCompare(right.p));
 
   const percent = value => `${new Intl.NumberFormat('en-IN', {maximumFractionDigits:2}).format(value)}%`;

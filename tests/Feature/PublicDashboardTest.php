@@ -3,7 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\ImportLog;
+use App\Models\IntimationClaim;
 use App\Models\PaidClaim;
+use App\Models\Province;
+use App\Models\District;
 use App\Models\User;
 use App\Services\PublicDashboardData;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -52,5 +55,43 @@ class PublicDashboardTest extends TestCase
         $this->assertIsArray($data['provinces']);
         $this->assertIsArray($data['outstandingClaims']);
         $this->assertIsArray($data['portfolioClaimRows']);
+    }
+
+    public function test_portfolio_claim_rows_normalize_intimation_statuses_and_keep_imports_separate(): void
+    {
+        $user = User::factory()->create();
+        $province = Province::query()->create(['province_name' => 'Bagmati', 'code' => '3']);
+        $district = District::query()->create(['province_id' => $province->province_id, 'district_name' => 'Kathmandu', 'code' => '25']);
+        $imports = collect(['older.xlsx', 'latest.xlsx'])->map(fn (string $file) => ImportLog::query()->create([
+            'date' => now()->toDateString(),
+            'user_id' => $user->user_id,
+            'upload_type' => 'intimation_claim',
+            'file_name' => $file,
+            'fiscal_year' => '2082-83',
+            'month' => 4,
+            'status' => 'completed',
+        ]));
+
+        foreach ($imports as $index => $import) {
+            IntimationClaim::query()->create([
+                'import_log_id' => $import->id,
+                'fiscal_year' => '2082-83',
+                'month' => 4,
+                'province' => (string) $province->province_id,
+                'district' => (string) $district->district_id,
+                'department' => 'Motor',
+                'estimated_loss' => 100,
+                'status' => $index === 0 ? 'OS' : 'Paid',
+            ]);
+        }
+
+        $rows = collect(app(PublicDashboardData::class)->toArray()['portfolioClaimRows'])
+            ->where('type', 'intimation');
+
+        $this->assertCount(2, $rows);
+        $this->assertSame(['outstanding', 'paid'], $rows->sortBy('import_id')->pluck('status')->all());
+        $this->assertSame($imports->pluck('id')->all(), $rows->sortBy('import_id')->pluck('import_id')->all());
+        $this->assertSame(['Bagmati'], $rows->pluck('province')->unique()->values()->all());
+        $this->assertSame(['Kathmandu'], $rows->pluck('district')->unique()->values()->all());
     }
 }

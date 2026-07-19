@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Branch;
 use App\Models\Complain;
+use App\Models\District;
 use App\Models\FinancialHighlightImport;
 use App\Models\OutstandingClaim;
 use App\Models\IntimationClaim;
@@ -11,7 +12,6 @@ use App\Models\ImportLog;
 use App\Models\PaidClaim;
 use App\Models\Policy;
 use App\Models\Province;
-use App\Models\WithdrawalClaim;
 use App\Support\NepaliFiscalCalendar;
 use Illuminate\Support\Collection;
 
@@ -54,6 +54,7 @@ class PublicDashboardData
             ->values();
         $fiscalYears = NepaliFiscalCalendar::fiscalYearOptions()
             ->merge($financialHighlightImports->pluck('fiscal_year'))
+            ->merge(ImportLog::query()->where('status', 'completed')->pluck('fiscal_year'))
             ->unique()
             ->sortDesc()
             ->values();
@@ -118,30 +119,42 @@ class PublicDashboardData
     private function portfolioClaimRows(): array
     {
         $policyLookup = $this->policyLookup();
+        $provinceLookup = Province::query()->get()->mapWithKeys(
+            fn (Province $province) => [$province->province_id => $province->province_name]
+        );
+        $districtLookup = District::query()->get()->mapWithKeys(
+            fn (District $district) => [$district->district_id => $district->district_name]
+        );
         $rows = collect();
 
-        $append = function ($claims, string $type, ?string $amountColumn = null, ?string $turnaroundColumn = null) use ($rows, $policyLookup): void {
+        $append = function ($claims, string $type, ?string $amountColumn = null, ?string $turnaroundColumn = null) use ($rows, $policyLookup, $provinceLookup, $districtLookup): void {
             foreach ($claims as $claim) {
                 $policy = $policyLookup->get((string) $claim->department);
                 $rows->push([
                     'type' => $type,
                     'fiscal_year' => (string) $claim->fiscal_year,
                     'month' => (int) $claim->month,
-                    'province' => $claim->province,
-                    'district' => $claim->district,
+                    'province' => $provinceLookup->get(trim((string) $claim->province), $claim->province),
+                    'district' => $districtLookup->get(trim((string) $claim->district), $claim->district),
                     // Department is the policy/portfolio; class is its sub-policy.
-                    'portfolio' => $policy?->policy_name ?? $claim->department ?? 'Other',
+                    'portfolio' => $this->portfolioName($claim->department, $policy),
                     'sub_policy' => $claim->class,
                     'amount' => $amountColumn ? (float) $claim->{$amountColumn} : 0,
                     'turnaround_days' => $turnaroundColumn ? (int) $claim->{$turnaroundColumn} : 0,
+                    'status' => $claim instanceof IntimationClaim ? $this->claimStatus($claim->status) : null,
+                    'import_id' => (int) $claim->import_log_id,
                 ]);
             }
         };
 
-        $append(IntimationClaim::query()->whereIn('import_log_id', $this->latestMonthlyImportIds('intimation_claim'))->get(), 'intimation');
-        $append(OutstandingClaim::query()->whereIn('import_log_id', $this->latestMonthlyImportIds('outstanding_claim'))->get(), 'outstanding', 'amount');
+        // Keep every completed intimation file available to the public filters. The browser
+        // selects the newest file overall, or the newest file containing a requested month.
+        $intimationImportIds = ImportLog::query()
+            ->where('upload_type', 'intimation_claim')
+            ->where('status', 'completed')
+            ->pluck('id');
+        $append(IntimationClaim::query()->whereIn('import_log_id', $intimationImportIds)->get(), 'intimation', 'estimated_loss');
         $append(PaidClaim::query()->whereIn('import_log_id', $this->latestMonthlyImportIds('paid_claim'))->get(), 'paid', 'total_paid_amount', 'turnaround_days');
-        $append(WithdrawalClaim::query()->whereIn('import_log_id', $this->latestMonthlyImportIds('withdrawal_claim'))->get(), 'withdrawal');
 
         return $rows
             ->groupBy(fn (array $row) => implode('|', [
@@ -151,6 +164,8 @@ class PublicDashboardData
                 $row['province'],
                 $row['district'],
                 $row['portfolio'],
+                $row['import_id'],
+                $row['status'],
             ]))
             ->map(function (Collection $group) {
                 $row = $group->first();
@@ -163,6 +178,19 @@ class PublicDashboardData
             })
             ->values()
             ->all();
+    }
+
+    private function claimStatus(?string $status): string
+    {
+        $value = strtolower(trim((string) $status));
+        $compact = preg_replace('/[^a-z]/', '', $value);
+
+        return match (true) {
+            in_array($compact, ['os', 'outstanding'], true) => 'outstanding',
+            in_array($compact, ['paid', 'settled'], true) => 'paid',
+            in_array($compact, ['withdrawal', 'withdrawn', 'withdraw'], true) => 'withdrawal',
+            default => 'other',
+        };
     }
 
     private function latestMonthlyImportIds(string $uploadType): array
@@ -183,22 +211,49 @@ class PublicDashboardData
         return Policy::with('parent')->get()->keyBy(fn ($policy) => (string) $policy->policy_id);
     }
 
+    private function portfolioName($department, ?Policy $policy): string
+    {
+        // These are the official top-level portfolio codes used by the reporting workbook.
+        $portfolioByCode = [
+            '14' => 'Property',
+            '15' => 'Marine',
+            '16' => 'Aviation',
+            '18' => 'Engineering',
+            '19' => 'Miscellaneous',
+            '28' => 'Agriculture',
+            '32' => 'Micro',
+            '46' => 'Motor',
+        ];
+        $code = trim((string) $department);
+
+        return $portfolioByCode[$code]
+            ?? $policy?->parent?->policy_name
+            ?? $policy?->policy_name
+            ?? ($code !== '' ? $code : 'Other');
+    }
+
     private function outstandingClaimRows(): array
     {
         $policyLookup = $this->policyLookup();
+        $provinceLookup = Province::query()->get()->mapWithKeys(
+            fn (Province $province) => [$province->province_id => $province->province_name]
+        );
+        $districtLookup = District::query()->get()->mapWithKeys(
+            fn (District $district) => [$district->district_id => $district->district_name]
+        );
 
         return OutstandingClaim::query()
             ->whereIn('import_log_id', $this->latestMonthlyImportIds('outstanding_claim'))
             ->get(['fiscal_year', 'month', 'province', 'district', 'department', 'class', 'development_year', 'amount'])
-            ->map(function (OutstandingClaim $claim) use ($policyLookup) {
+            ->map(function (OutstandingClaim $claim) use ($policyLookup, $provinceLookup, $districtLookup) {
                 $policy = $policyLookup->get((string) $claim->department);
 
                 return [
                     'fiscal_year' => (string) $claim->fiscal_year,
                     'month' => (int) $claim->month,
-                    'province' => $claim->province,
-                    'district' => $claim->district,
-                    'portfolio' => $policy?->policy_name ?? $claim->department ?? 'Other',
+                    'province' => $provinceLookup->get(trim((string) $claim->province), $claim->province),
+                    'district' => $districtLookup->get(trim((string) $claim->district), $claim->district),
+                    'portfolio' => $this->portfolioName($claim->department, $policy),
                     'bucket' => $this->developmentBucket($claim->development_year),
                     'amount' => (float) $claim->amount,
                 ];
