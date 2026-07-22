@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Branch;
 use App\Models\District;
+use App\Models\NetworkPersonnel;
 use App\Models\Policy;
 use App\Models\Province;
 use App\Support\NepaliFiscalCalendar;
@@ -20,6 +21,14 @@ class MasterDataController extends Controller
         $districts = District::with('province')->withCount('branches')->orderBy('district_id')->get();
         $policies = Policy::orderBy('policy_id')->get();
         $branches = Branch::with(['province', 'district'])->orderBy('branch_code')->get();
+        $networkPersonnel = NetworkPersonnel::all()
+            ->sortByDesc(fn (NetworkPersonnel $row) => sprintf(
+                '%s-%02d',
+                $row->fiscal_year,
+                NepaliFiscalCalendar::fiscalMonthOrder((int) $row->month) ?? 0
+            ))
+            ->values();
+        $fiscalYears = $fiscalYears->merge($networkPersonnel->pluck('fiscal_year'))->unique()->sortDesc()->values();
         $complainTypes = DB::table('grievance_types')->orderBy('id')->get();
         $allProvinces = Province::orderBy('province_name')->get(['province_id', 'province_name']);
         $allDistricts = District::with('province')->orderBy('district_name')->get(['district_id', 'province_id', 'district_name']);
@@ -30,6 +39,7 @@ class MasterDataController extends Controller
             'districts',
             'policies',
             'branches',
+            'networkPersonnel',
             'complainTypes',
             'allProvinces',
             'allDistricts',

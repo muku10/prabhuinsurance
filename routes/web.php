@@ -10,6 +10,7 @@ use App\Http\Controllers\ComplainController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ImportLogController;
 use App\Http\Controllers\MasterDataController;
+use App\Http\Controllers\NetworkPersonnelController;
 use App\Http\Controllers\PublicDashboardController;
 use App\Http\Controllers\FinancialHighlightController;
 use Illuminate\Support\Facades\Route;
@@ -47,6 +48,7 @@ Route::middleware('auth')->group(function () {
     Route::resource('districts', DistrictController::class)->except(['show']);
     Route::resource('policies', PolicyController::class)->except(['show']);
     Route::resource('branches', BranchController::class)->except(['show']);
+    Route::resource('network-personnel', NetworkPersonnelController::class)->only(['store', 'update', 'destroy']);
     Route::get('/grievances/template/download', [ComplainController::class, 'template'])->name('grievances.template');
     Route::resource('grievances', ComplainController::class)
         ->parameters(['grievances' => 'complain'])

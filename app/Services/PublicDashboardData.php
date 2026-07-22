@@ -8,6 +8,7 @@ use App\Models\District;
 use App\Models\FinancialHighlightImport;
 use App\Models\OutstandingClaim;
 use App\Models\IntimationClaim;
+use App\Models\NetworkPersonnel;
 use App\Models\ImportLog;
 use App\Models\PaidClaim;
 use App\Models\Policy;
@@ -91,6 +92,7 @@ class PublicDashboardData
             ->values();
         $fiscalYears = $fiscalYears
             ->merge($grievanceReports->pluck('fiscal_year'))
+            ->merge(NetworkPersonnel::query()->pluck('fiscal_year'))
             ->unique()
             ->sortDesc()
             ->values();
@@ -108,6 +110,7 @@ class PublicDashboardData
             'outstandingClaims' => $this->outstandingClaimRows(),
             'portfolioClaimRows' => $this->portfolioClaimRows(),
             'branchNetworkRows' => $this->branchNetworkRows()->all(),
+            'networkPersonnelRows' => $this->networkPersonnelRows()->all(),
             'totalProvinceCount' => $provinces->count(),
             'financialHighlights' => $financialHighlights->all(),
             'latestFinancialFiscalYear' => $latestFinancialHighlightImport?->fiscal_year,
@@ -309,6 +312,19 @@ class PublicDashboardData
                 'status' => $branch->status,
                 'inactive_fiscal_year' => $branch->inactive_fiscal_year,
                 'inactive_month' => $branch->inactive_month ? (int) $branch->inactive_month : null,
+            ])
+            ->values();
+    }
+
+    private function networkPersonnelRows(): Collection
+    {
+        return NetworkPersonnel::query()
+            ->get()
+            ->map(fn (NetworkPersonnel $person) => [
+                'type' => $person->type,
+                'fiscal_year' => $person->fiscal_year,
+                'month' => (int) $person->month,
+                'number' => (int) $person->number,
             ])
             ->values();
     }

@@ -12,7 +12,7 @@ class PublicDashboardController extends Controller
     {
         $ttl = config('dashboard.public_cache_ttl');
         $data = $ttl > 0
-            ? Cache::remember('public-dashboard:data:v9', $ttl, fn () => $dashboardData->toArray())
+            ? Cache::remember('public-dashboard:data:v10', $ttl, fn () => $dashboardData->toArray())
             : $dashboardData->toArray();
 
         return view('public-dashboard', $data);

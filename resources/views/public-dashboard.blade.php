@@ -657,6 +657,7 @@ updateFinancialHighlights();
 
 // network
 const branchNetworkRows = @json($branchNetworkRows);
+const networkPersonnelRows = @json($networkPersonnelRows);
 const totalProvinceCount = @json($totalProvinceCount);
 
 function fiscalYearStart(fiscalYear){
@@ -703,6 +704,15 @@ function filteredBranches(){
   });
 }
 
+function personnelCount(type){
+  const selectedSerial = selectedPeriodSerial();
+  const latest = networkPersonnelRows
+    .filter(row => row.type === type && periodSerial(row.fiscal_year, row.month) <= selectedSerial)
+    .sort((a, b) => periodSerial(b.fiscal_year, b.month) - periodSerial(a.fiscal_year, a.month))[0];
+
+  return latest ? latest.number : 0;
+}
+
 function renderNetwork(network){
   document.getElementById('networkList').innerHTML = network.map(([l,v,url])=>`
     <div class="flex items-center gap-3 rounded-xl border border-line/70 bg-brand-soft/40 p-3">
@@ -746,8 +756,8 @@ function updateBranchNetwork(){
   renderNetwork([
     ['Total Branch Offices', new Intl.NumberFormat('en-IN').format(rows.length), 'https://prabhuinsurance.com/our-network/'],
     ['Provinces Covered', `${new Intl.NumberFormat('en-IN').format(provinces.length)} / ${new Intl.NumberFormat('en-IN').format(totalProvinceCount)}`],
-    ['Licensed Agents', '0', 'https://prabhuinsurance.com/about-us/our-agents/'],
-    ['Surveyors', '0', 'https://prabhuinsurance.com/about-us/surveyors-list/'],
+    ['Licensed Agents', new Intl.NumberFormat('en-IN').format(personnelCount('agent')), 'https://prabhuinsurance.com/about-us/our-agents/'],
+    ['Surveyors', new Intl.NumberFormat('en-IN').format(personnelCount('surveyor')), 'https://prabhuinsurance.com/about-us/surveyors-list/'],
   ]);
   renderBranches(branches);
 

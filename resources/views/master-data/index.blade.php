@@ -8,6 +8,7 @@
             <a href="#" data-tab="dist">Districts</a>
             <a href="#" data-tab="pt">Policy Types</a>
             <a href="#" data-tab="br">Branches</a>
+            <a href="#" data-tab="np">Agents &amp; Surveyors</a>
             <a href="#" data-tab="ct">Grievance Types</a>
             <a href="#" data-tab="conf">Configuration</a>
         </nav>
@@ -142,6 +143,41 @@
                             </tr>
                         @empty
                             <tr><td colspan="9" class="text-muted">No branches found.</td></tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {{-- ===================== AGENTS & SURVEYORS ===================== --}}
+        <div data-tab-panel="np" class="hide">
+            <div class="flex between center mb-3">
+                <h2 style="margin:0; font-size:16px;">Agent &amp; Surveyor Updates ({{ $networkPersonnel->count() }})</h2>
+                <button type="button" class="btn btn-primary" @click="addPersonnel()">+ Add Period Update</button>
+            </div>
+            <div class="table-wrap">
+                <table class="t">
+                    <thead><tr><th>Type</th><th>Fiscal Year</th><th>Month</th><th>Number</th><th>Updated</th><th class="text-right">Actions</th></tr></thead>
+                    <tbody>
+                        @forelse ($networkPersonnel as $personnel)
+                            <tr>
+                                <td>{{ $personnel->type === 'agent' ? 'Licensed Agents' : 'Surveyors' }}</td>
+                                <td>{{ $personnel->fiscal_year }}</td>
+                                <td>{{ $monthNames[$personnel->month] ?? $personnel->month }}</td>
+                                <td class="num">{{ number_format($personnel->number) }}</td>
+                                <td>{{ $personnel->updated_at?->format('d M Y') ?? '-' }}</td>
+                                <td class="text-right">
+                                    <button type="button" class="btn btn-ghost btn-sm"
+                                        @click='openPersonnel({{ $personnel->id }}, {{ json_encode($personnel->type) }}, {{ json_encode($personnel->fiscal_year) }}, {{ (int) $personnel->month }}, {{ (int) $personnel->number }})'>Edit</button>
+                                    <form action="{{ route('network-personnel.destroy', $personnel->id) }}" method="POST" style="display:inline" onsubmit="return confirm('Delete this period update?')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-ghost btn-sm" style="color:var(--danger);">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr><td colspan="6" class="text-muted">No agent or surveyor updates found.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -399,16 +435,69 @@
             </div>
         </div>
 
+        {{-- ============== AGENT / SURVEYOR PERIOD MODAL ============== --}}
+        <div class="modal-overlay" x-show="modals.personnel" x-cloak x-transition.opacity @keydown.escape.window="closeAll()" @click.self="closeAll()">
+            <div class="modal-box" x-transition.scale.origin.center>
+                <div class="modal-head">
+                    <h3 x-text="personnelForm.mode === 'create' ? 'Add Period Update' : 'Edit Period Update'">Period Update</h3>
+                    <button type="button" class="modal-close" @click="closeAll()">&times;</button>
+                </div>
+                <form :action="personnelForm.action" method="POST">
+                    @csrf
+                    <template x-if="personnelForm.mode === 'edit'"><input type="hidden" name="_method" value="PUT"></template>
+                    <div class="modal-body">
+                        <div class="grid cols-2">
+                            <div class="field mb-4">
+                                <label for="personnel_type">Data Type</label>
+                                <select class="input" id="personnel_type" name="type" x-model="personnelForm.type" required>
+                                    <option value="agent">Licensed Agents</option>
+                                    <option value="surveyor">Surveyors</option>
+                                </select>
+                            </div>
+                            <div class="field mb-4">
+                                <label for="personnel_number">Total Number</label>
+                                <input class="input" id="personnel_number" type="number" name="number" x-model.number="personnelForm.number" required min="0">
+                            </div>
+                            <div class="field mb-4">
+                                <label for="personnel_fiscal_year">Fiscal Year</label>
+                                <select class="input" id="personnel_fiscal_year" name="fiscal_year" x-model="personnelForm.fiscalYear" required>
+                                    <option value="">Select Fiscal Year</option>
+                                    @foreach ($fiscalYears as $fiscalYear)
+                                        <option value="{{ $fiscalYear }}">{{ $fiscalYear }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="field mb-4">
+                                <label for="personnel_month">Month</label>
+                                <select class="input" id="personnel_month" name="month" x-model="personnelForm.month" required>
+                                    <option value="">Select Month</option>
+                                    @foreach ($monthNames as $monthValue => $monthName)
+                                        <option value="{{ $monthValue }}">{{ $monthName }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        </div>
+                        <p class="text-muted" style="margin:0; font-size:12px;">Add a new total whenever the number changes. Historical period updates are retained for dashboard filters.</p>
+                    </div>
+                    <div class="modal-foot">
+                        <button type="button" class="btn btn-outline" @click="closeAll()">Cancel</button>
+                        <button type="submit" class="btn btn-primary" x-text="personnelForm.mode === 'create' ? 'Save Update' : 'Update Record'">Save Update</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
     </div>
 
     <script>
         function masterData() {
             return {
-                modals: { province: false, district: false, policy: false, branch: false },
+                modals: { province: false, district: false, policy: false, branch: false, personnel: false },
                 provinceForm: { mode: 'create', action: '', name: '', code: '' },
                 districtForm: { mode: 'create', action: '', provinceId: '', name: '', code: '' },
                 policyForm: { mode: 'create', action: '', policyId: null, parentId: '', name: '', nameNp: '', code: '', status: 'active' },
                 branchForm: { mode: 'create', action: '', branchCode: null, extBranchCode: '', branchName: '', provinceId: '', districtId: '', fiscalYear: '', month: '', localLevel: null, address: '', displayName: '', status: 'active', inactiveFiscalYear: '', inactiveMonth: '' },
+                personnelForm: { mode: 'create', action: '', type: 'agent', fiscalYear: '', month: '', number: 0 },
 
                 addProvince() {
                     this.closeAll();
@@ -447,6 +536,12 @@
                     this.policyForm.code = '';
                     this.policyForm.status = 'active';
                     this.modals.policy = true;
+                },
+
+                addPersonnel() {
+                    this.closeAll();
+                    this.personnelForm = { mode: 'create', action: '{{ route('network-personnel.store') }}', type: 'agent', fiscalYear: '', month: '', number: 0 };
+                    this.modals.personnel = true;
                 },
 
                 openProvince(id, name, code) {
@@ -488,11 +583,18 @@
                     this.modals.branch = true;
                 },
 
+                openPersonnel(id, type, fiscalYear, month, number) {
+                    this.closeAll();
+                    this.personnelForm = { mode: 'edit', action: '{{ route('network-personnel.update', '__ID__') }}'.replace('__ID__', id), type, fiscalYear, month: String(month), number };
+                    this.modals.personnel = true;
+                },
+
                 closeAll() {
                     this.modals.province = false;
                     this.modals.district = false;
                     this.modals.policy = false;
                     this.modals.branch = false;
+                    this.modals.personnel = false;
                 },
             };
         }
