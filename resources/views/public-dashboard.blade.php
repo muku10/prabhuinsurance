@@ -10,7 +10,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-@vite(['resources/css/custom-select.css', 'resources/js/custom-select.js'])
+<style>{!! file_get_contents(resource_path('css/custom-select.css')) !!}</style>
+<script>{!! file_get_contents(resource_path('js/custom-select.js')) !!}</script>
 <script>
 tailwind.config = {
   theme: {
