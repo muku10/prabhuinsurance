@@ -340,8 +340,9 @@ const latestFinancialQuarter = Number(@json($latestFinancialQuarter));
 function refreshDistricts(){
   const province = provinceSelect.value;
   districtSelect.replaceChildren(new Option(province ? 'All districts' : 'Select a province first', ''));
-  (PROV[province] || []).forEach(name => districtSelect.add(new Option(name, name)));
   districtSelect.disabled = !province;
+  const districts = PROV[province] || [];
+  Object.values(districts).forEach(name => districtSelect.add(new Option(name, name)));
   window.CustomSelects?.refresh();
   updateBranchNetwork();
   updateOutstandingClaims();
