@@ -44,33 +44,20 @@ tailwind.config = {
 </head>
 <body class="min-h-screen">
 
-<!-- Back bar -->
-<div class="border-b border-line bg-white">
-  <div class="mx-auto max-w-7xl flex items-center justify-between gap-3 px-6 py-2 text-xs">
-    <a href="https://prabhuinsurance.com" class="inline-flex items-center gap-1.5 font-medium text-mute hover:text-brand transition-colors">
-      <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
-      Back to main website
-    </a>
-    <span class="hidden sm:inline text-mute">prabhuinsurance.com</span>
-  </div>
-</div>
-
 <!-- Banner -->
 <div class="brand-gradient text-white">
   <div class="mx-auto max-w-7xl flex flex-col gap-4 px-6 py-6 md:flex-row md:items-center md:justify-between">
     <div class="flex items-center gap-4">
       <div class="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-white/95 p-2 shadow-lg ring-1 ring-white/40">
-        <div class="grid h-full w-full place-items-center rounded-md bg-brand text-white text-lg font-bold">P</div>
+        <img src="{{ asset('images/logo.png') }}" alt="Prabhu Insurance Limited" class="h-full w-full object-contain">
       </div>
       <div class="min-w-0">
-        <p class="text-xs font-medium tracking-[0.25em] text-white/70 uppercase">Public Disclosure</p>
         <h1 class="truncate text-xl font-semibold sm:text-2xl">Transparency Dashboard · Prabhu Insurance Limited</h1>
         <p class="text-xs text-white/70">Fiscal Year <span id="bannerFiscalYear">{{ $latestFinancialFiscalYear ?? ($fiscalYears[0] ?? 'N/A') }}</span> (YTD) · Last updated <span id="today"></span></p>
       </div>
     </div>
     <div class="flex flex-wrap items-center gap-2 text-xs">
-      <a href="https://prabhuinsurance.com" class="rounded-full bg-white/15 px-3 py-1.5 ring-1 ring-white/20 backdrop-blur hover:bg-white/25 transition-colors">Visit Homepage</a>
-      <span class="rounded-full bg-white/15 px-3 py-1.5 ring-1 ring-white/20 backdrop-blur">Amounts in NPR unless noted</span>
+      <a href="https://prabhuinsurance.com" target="_blank" rel="noopener noreferrer" class="rounded-full bg-white/15 px-3 py-1.5 ring-1 ring-white/20 backdrop-blur hover:bg-white/25 transition-colors">Visit Homepage</a>
     </div>
   </div>
 </div>
@@ -132,11 +119,10 @@ tailwind.config = {
   <section class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
     <!-- kpi -->
     <div class="relative overflow-hidden rounded-2xl border border-line bg-white p-5 card-shadow">
-      <div class="flex items-start justify-between">
+      <div class="flex items-start">
         <span class="grid h-9 w-9 place-items-center rounded-lg bg-brand text-white">
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12V8H6a2 2 0 0 1 0-4h12v4"/><path d="M4 6v12a2 2 0 0 0 2 2h14v-4"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg>
         </span>
-        <span class="text-[10px] font-medium tracking-wide text-mute uppercase">+8.4% YoY</span>
       </div>
       <p class="mt-4 text-[11px] font-medium tracking-wide text-mute uppercase">Premium Collected</p>
       <p class="mt-1 text-2xl font-semibold tracking-tight tabular-nums">99,441,499.02</p>
@@ -144,44 +130,40 @@ tailwind.config = {
       <span class="pointer-events-none absolute -right-8 -bottom-8 h-24 w-24 rounded-full bg-brand-soft kpi-blur"></span>
     </div>
     <div class="relative overflow-hidden rounded-2xl border border-line bg-white p-5 card-shadow">
-      <div class="flex items-start justify-between">
+      <div class="flex items-start">
         <span class="grid h-9 w-9 place-items-center rounded-lg bg-brand-soft text-brand">
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
         </span>
-        <span class="text-[10px] font-medium tracking-wide text-mute uppercase">19.3% loss ratio</span>
       </div>
       <p class="mt-4 text-[11px] font-medium tracking-wide text-mute uppercase">Claims Paid</p>
       <p class="mt-1 text-2xl font-semibold tracking-tight tabular-nums">19,219,809.30</p>
       <p class="mt-0.5 text-xs text-mute">NPR</p>
     </div>
     <div class="relative overflow-hidden rounded-2xl border border-line bg-white p-5 card-shadow">
-      <div class="flex items-start justify-between">
+      <div class="flex items-start">
         <span class="grid h-9 w-9 place-items-center rounded-lg bg-success/10 text-success">
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
         </span>
-        <span class="text-[10px] font-medium tracking-wide text-success uppercase">Healthy</span>
       </div>
       <p class="mt-4 text-[11px] font-medium tracking-wide text-mute uppercase">Solvency Ratio</p>
       <p id="publicSolvencyValue" class="mt-1 text-2xl font-semibold tracking-tight tabular-nums">—</p>
       <p id="publicSolvencyPeriod" class="mt-0.5 text-xs text-mute">Latest reported quarter</p>
     </div>
     <div class="relative overflow-hidden rounded-2xl border border-line bg-white p-5 card-shadow">
-      <div class="flex items-start justify-between">
+      <div class="flex items-start">
         <span class="grid h-9 w-9 place-items-center rounded-lg bg-accent/25 text-brand-deep">
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
         </span>
-        <span class="text-[10px] font-medium tracking-wide text-mute uppercase">Positive</span>
       </div>
       <p class="mt-4 text-[11px] font-medium tracking-wide text-mute uppercase">Premium Growth</p>
       <p class="mt-1 text-2xl font-semibold tracking-tight tabular-nums">8.4%</p>
       <p class="mt-0.5 text-xs text-mute">vs. FY 2081-82</p>
     </div>
     <div class="relative overflow-hidden rounded-2xl border border-line bg-white p-5 card-shadow">
-      <div class="flex items-start justify-between">
+      <div class="flex items-start">
         <span class="grid h-9 w-9 place-items-center rounded-lg bg-brand-soft text-brand">
           <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="14" rx="1"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         </span>
-        <span class="text-[10px] font-medium tracking-wide text-mute uppercase">Nationwide</span>
       </div>
       <p class="mt-4 text-[11px] font-medium tracking-wide text-mute uppercase">Network Branches</p>
       <p class="mt-1 text-2xl font-semibold tracking-tight tabular-nums">57</p>
@@ -211,27 +193,14 @@ tailwind.config = {
     </section>
   </div>
 
-  <!-- Row: Policy & Premium + Products -->
-  <div class="grid gap-6 lg:grid-cols-3">
-    <section class="lg:col-span-2 overflow-hidden rounded-2xl border border-line bg-white card-shadow">
+  <!-- Policy & Premium -->
+  <section class="overflow-hidden rounded-2xl border border-line bg-white card-shadow">
       <header class="flex items-center gap-2.5 border-b border-line bg-brand-soft px-5 py-3">
-        <span class="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-brand text-white text-xs">₹</span>
+        <span class="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-brand text-white text-xs">रू</span>
         <h2 class="text-sm font-semibold tracking-wide text-brand-deep uppercase">Policy &amp; Premium</h2>
       </header>
       <div class="p-5 overflow-x-auto" id="policyTable"></div>
-    </section>
-
-    <section class="overflow-hidden rounded-2xl border border-line bg-white card-shadow">
-      <header class="flex items-center justify-between border-b border-line bg-brand-soft px-5 py-3">
-        <div class="flex items-center gap-2.5">
-          <span class="grid h-7 w-7 shrink-0 place-items-center rounded-md bg-brand text-white text-xs">◎</span>
-          <h2 class="text-sm font-semibold tracking-wide text-brand-deep uppercase">Our Insurance Products</h2>
-        </div>
-        <a href="#" class="text-xs font-medium text-brand hover:text-brand-deep">Browse →</a>
-      </header>
-      <ul class="p-5 grid grid-cols-1 gap-2 sm:grid-cols-2" id="productsList"></ul>
-    </section>
-  </div>
+  </section>
 
   <!-- Portfoliowise claims -->
   <section class="overflow-hidden rounded-2xl border border-line bg-white card-shadow">
@@ -327,7 +296,7 @@ tailwind.config = {
   </section>
 
   <footer class="mt-4 flex flex-col items-start justify-between gap-3 border-t border-line pt-6 text-xs text-mute sm:flex-row sm:items-center">
-    <p>© <span id="year"></span> Prabhu Insurance Limited. All figures are unaudited YTD unless stated otherwise.</p>
+    <p>© <span id="year"></span> Prabhu Insurance Limited.</p>
     <p>Prepared in accordance with Nepal Insurance Authority disclosure guidelines.</p>
   </footer>
 </main>
@@ -686,13 +655,6 @@ function renderFinancialHighlightsTable(selectedFiscalYear, quarter){
 
 updateFinancialHighlights();
 
-// products
-const products = ["Motor Insurance","Property & Fire","Marine & Cargo","Engineering & Contractors","Aviation","Agriculture & Livestock","Micro Insurance","Miscellaneous & Liability"];
-document.getElementById('productsList').innerHTML = products.map(p=>`
-  <li class="flex items-center gap-2 rounded-lg border border-line/70 bg-brand-soft/40 px-3 py-2 text-sm">
-    <span class="h-1.5 w-1.5 rounded-full bg-brand"></span><span class="truncate">${p}</span>
-  </li>`).join('');
-
 // network
 const branchNetworkRows = @json($branchNetworkRows);
 const totalProvinceCount = @json($totalProvinceCount);
@@ -742,11 +704,11 @@ function filteredBranches(){
 }
 
 function renderNetwork(network){
-  document.getElementById('networkList').innerHTML = network.map(([l,v])=>`
+  document.getElementById('networkList').innerHTML = network.map(([l,v,url])=>`
     <div class="flex items-center gap-3 rounded-xl border border-line/70 bg-brand-soft/40 p-3">
       <span class="grid h-9 w-9 place-items-center rounded-lg bg-brand text-white text-xs">◉</span>
       <div class="min-w-0 flex-1"><dt class="text-xs text-mute">${l}</dt><dd class="text-lg font-semibold tabular-nums">${v}</dd></div>
-      <a href="#" class="text-xs font-medium text-brand hover:text-brand-deep">View</a>
+      ${url ? `<a href="${url}" target="_blank" rel="noopener noreferrer" class="text-xs font-medium text-brand hover:text-brand-deep">View</a>` : ''}
     </div>`).join('');
 }
 
@@ -782,10 +744,10 @@ function updateBranchNetwork(){
     ]);
 
   renderNetwork([
-    ['Total Branch Offices', new Intl.NumberFormat('en-IN').format(rows.length)],
+    ['Total Branch Offices', new Intl.NumberFormat('en-IN').format(rows.length), 'https://prabhuinsurance.com/our-network/'],
     ['Provinces Covered', `${new Intl.NumberFormat('en-IN').format(provinces.length)} / ${new Intl.NumberFormat('en-IN').format(totalProvinceCount)}`],
-    ['Licensed Agents', '0'],
-    ['Surveyors', '0'],
+    ['Licensed Agents', '0', 'https://prabhuinsurance.com/about-us/our-agents/'],
+    ['Surveyors', '0', 'https://prabhuinsurance.com/about-us/surveyors-list/'],
   ]);
   renderBranches(branches);
 
