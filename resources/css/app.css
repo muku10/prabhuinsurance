@@ -1,3 +1,5 @@
+@import './custom-select.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -13,6 +15,33 @@
     --line: #E5E7EB;
     --bg: #F4F5F7;
     --shadow-lg: 0 10px 25px -10px rgba(206, 32, 30, .25), 0 4px 10px rgba(17, 24, 39, .06);
+}
+
+/* Keep form-control interaction states consistent throughout the application. */
+:where(input:not([type='hidden']):not([type='submit']):not([type='button']):not([type='reset']):not([type='image']), select, textarea) {
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+:where(input:not([type='hidden']):not([type='submit']):not([type='button']):not([type='reset']):not([type='image']), select, textarea):not(:disabled):hover {
+    border-color: var(--brand);
+}
+
+:where(input:not([type='hidden']):not([type='submit']):not([type='button']):not([type='reset']):not([type='image']), select, textarea):focus {
+    outline: none;
+    border-color: var(--brand);
+    --tw-ring-color: rgba(206, 32, 30, .2);
+    box-shadow: 0 0 0 3px rgba(206, 32, 30, .12);
+}
+
+select {
+    accent-color: var(--brand);
+}
+
+select option:checked,
+select option:hover,
+select option:focus {
+    background: var(--brand) linear-gradient(0deg, var(--brand), var(--brand));
+    color: #fff;
 }
 
 .auth-login-body {
@@ -205,6 +234,10 @@
     outline: none;
     border-color: var(--brand);
     box-shadow: 0 0 0 3px rgba(206, 32, 30, .12);
+}
+
+.login-form .input:not(:disabled):hover {
+    border-color: var(--brand);
 }
 
 .login-form .actions {
@@ -761,6 +794,11 @@ body.admin-body {
     outline: none;
     border-color: var(--brand);
     box-shadow: 0 0 0 3px rgba(206, 32, 30, .12);
+}
+
+.input:not(:disabled):hover,
+.select:not(:disabled):hover {
+    border-color: var(--brand);
 }
 
 .input-row {

@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+@vite(['resources/css/custom-select.css', 'resources/js/custom-select.js'])
 <script>
 tailwind.config = {
   theme: {
@@ -32,6 +33,7 @@ tailwind.config = {
 </script>
 <style>
   :root{
+    --brand:#b3261e; --line:#ecdfdc; --ink:#241612;
     --c1:#b3261e; --c2:#e0733a; --c3:#e0a458; --c4:#3d7fa8; --c5:#7d5aa8; --c6:#7a1a15;
   }
   html,body{background:#fbf7f5;color:#241612;font-family:Inter,system-ui,sans-serif;}
@@ -40,6 +42,11 @@ tailwind.config = {
   .card-shadow{box-shadow:0 1px 2px rgba(36,22,18,.04),0 8px 24px -12px rgba(36,22,18,.08);}
   table{border-collapse:separate;border-spacing:0;}
   .kpi-blur{filter:blur(24px);opacity:.4;}
+  select{transition:border-color .15s ease,box-shadow .15s ease;}
+  select:not(:disabled):hover{border-color:#b3261e;}
+  select:focus{outline:none;border-color:#b3261e;box-shadow:0 0 0 3px rgba(179,38,30,.14);}
+  select{accent-color:#b3261e;}
+  select option:checked,select option:hover,select option:focus{background:#b3261e linear-gradient(0deg,#b3261e,#b3261e);color:#fff;}
 </style>
 </head>
 <body class="min-h-screen">
@@ -65,12 +72,23 @@ tailwind.config = {
 <!-- Filters -->
 <div class="border-b border-line bg-brand-soft/60">
   <div class="mx-auto max-w-7xl px-6 py-4">
-    <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-      <div class="flex items-center gap-2 text-xs font-semibold tracking-wide text-brand-deep uppercase">
-        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-        Filter Reports
+    <div class="rounded-xl border border-line/80 bg-white/70 p-4 card-shadow">
+      <div class="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div class="flex items-center gap-2 text-sm font-semibold text-brand-deep">
+            <span class="grid h-7 w-7 place-items-center rounded-md bg-brand-soft text-brand">
+              <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            </span>
+            Report filters
+          </div>
+          <p class="mt-1 text-xs text-mute">Results update automatically when you change a filter.</p>
+        </div>
+        <button type="button" onclick="resetFilters()" class="inline-flex items-center gap-1.5 rounded-md border border-line bg-white px-3 py-2 text-xs font-medium text-mute shadow-sm transition-colors hover:border-brand hover:text-brand">
+          <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+          Clear filters
+        </button>
       </div>
-      <div class="grid flex-1 grid-cols-2 gap-3 md:grid-cols-4 lg:max-w-4xl">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <label class="flex flex-col gap-1">
           <span class="text-[10px] font-semibold tracking-wide text-mute uppercase">Fiscal Year</span>
           <select id="fiscalYearSel" class="h-9 rounded-md border border-line bg-white px-2.5 text-sm font-medium shadow-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20">
@@ -100,16 +118,15 @@ tailwind.config = {
         <label class="flex flex-col gap-1">
           <span class="text-[10px] font-semibold tracking-wide text-mute uppercase">District</span>
           <select id="districtSel" disabled class="h-9 rounded-md border border-line bg-white px-2.5 text-sm font-medium shadow-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:opacity-50 disabled:cursor-not-allowed">
-            <option value="">All</option>
+            <option value="">Select a province first</option>
           </select>
         </label>
       </div>
-      <div class="flex gap-2 self-start lg:self-end">
-        <button onclick="applyFilters()" class="rounded-md bg-brand px-3 py-2 text-xs font-medium text-white hover:bg-brand-deep transition-colors">Filter</button>
-        <button onclick="resetFilters()" class="rounded-md border border-line bg-white px-3 py-2 text-xs font-medium text-mute hover:border-brand hover:text-brand transition-colors">Reset</button>
+      <div id="filterState" role="status" aria-live="polite" class="mt-4 flex items-center gap-2 rounded-lg bg-brand-soft/70 px-3 py-2 text-xs text-mute">
+        <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-brand"></span>
+        <span id="filterStateText"></span>
       </div>
     </div>
-    <div id="filterState" class="mt-3 text-xs text-mute"></div>
   </div>
 </div>
 
@@ -321,7 +338,7 @@ const latestFinancialFiscalYear = @json($latestFinancialFiscalYear);
 const latestFinancialQuarter = Number(@json($latestFinancialQuarter));
 function refreshDistricts(){
   const province = provinceSelect.value;
-  districtSelect.replaceChildren(new Option('All', ''));
+  districtSelect.replaceChildren(new Option(province ? 'All districts' : 'Select a province first', ''));
   (PROV[province] || []).forEach(name => districtSelect.add(new Option(name, name)));
   districtSelect.disabled = !province;
   updateBranchNetwork();
@@ -337,16 +354,7 @@ function resetFilters(){
   updateGrievances();
   updateOutstandingClaims();
   updatePortfolioClaims();
-}
-function applyFilters(){
-  fiscalYearSelect.dispatchEvent(new Event('change'));
-  monthSelect.dispatchEvent(new Event('change'));
-  provinceSelect.dispatchEvent(new Event('change'));
-  districtSelect.dispatchEvent(new Event('change'));
-  updateBranchNetwork();
-  updateFinancialHighlights();
-  updateGrievances();
-  updateOutstandingClaims();
+  window.CustomSelects?.refresh();
 }
 provinceSelect.addEventListener('change', refreshDistricts);
 fiscalYearSelect.addEventListener('change', updateBranchNetwork);
@@ -766,8 +774,8 @@ function updateBranchNetwork(){
     : 'All months';
   const provinceLabel = provinceSelect.value || 'All provinces';
   const districtLabel = districtSelect.value || 'All districts';
-  document.getElementById('filterState').textContent =
-    `Applied to branch network: FY ${fiscalYearSelect.value}, ${monthLabel}, ${provinceLabel}, ${districtLabel} - ${rows.length} branch(es) visible.`;
+  document.getElementById('filterStateText').textContent =
+    `Showing FY ${fiscalYearSelect.value} · ${monthLabel} · ${provinceLabel} · ${districtLabel} · ${rows.length} ${rows.length === 1 ? 'branch' : 'branches'}`;
 }
 
 updateBranchNetwork();
