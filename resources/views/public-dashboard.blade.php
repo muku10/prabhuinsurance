@@ -342,6 +342,7 @@ function refreshDistricts(){
   districtSelect.replaceChildren(new Option(province ? 'All districts' : 'Select a province first', ''));
   (PROV[province] || []).forEach(name => districtSelect.add(new Option(name, name)));
   districtSelect.disabled = !province;
+  window.CustomSelects?.refresh();
   updateBranchNetwork();
   updateOutstandingClaims();
   updatePortfolioClaims();
