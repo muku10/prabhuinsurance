@@ -102,9 +102,15 @@ class ImportLogController extends Controller
         $selectedImportLogId = request()->integer('import_log_id') ?: session('selected_import_log_id');
         $selectedImportLog = $selectedImportLogId
             ? $availableImportLogs->firstWhere('id', $selectedImportLogId)
-            : $availableImportLogs->first();
+            : null;
+        $availableUploadTypes = array_keys(self::UPLOAD_FIELD_MAP);
 
-        return view('import-logs.import', compact('availableImportLogs', 'monthNames', 'selectedImportLog'));
+        return view('import-logs.import', compact(
+            'availableImportLogs',
+            'availableUploadTypes',
+            'monthNames',
+            'selectedImportLog'
+        ));
     }
 
     public function store(Request $request): RedirectResponse
@@ -174,10 +180,17 @@ class ImportLogController extends Controller
     public function importFromModule(Request $request): RedirectResponse
     {
         $validated = $request->validate([
+            'upload_type' => ['required', 'string', 'in:'.implode(',', array_keys(self::UPLOAD_FIELD_MAP))],
             'import_log_id' => ['required', 'integer', 'exists:import_logs,id'],
         ]);
 
         $importLog = $this->importableImportLogQuery()->findOrFail($validated['import_log_id']);
+
+        if ($this->normalizeUploadType($importLog->upload_type) !== $validated['upload_type']) {
+            return back()->withErrors([
+                'import_log_id' => 'The selected file does not belong to the selected import type.',
+            ])->withInput();
+        }
 
         return $this->performImport($importLog, 'upload.import-module');
     }
